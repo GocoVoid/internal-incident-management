@@ -1,0 +1,235 @@
+import React from 'react';
+import LoginForm from '../components/auth/LoginForm';
+import pratitiLogo from '../assets/pratiti_logo.png'
+
+/* ── Pratiti SVG logo (inline, matches uploaded asset) ─────── */
+const PratitiLogo = ({ className = '' }) => (
+  <svg className={className} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Top-left petal — cyan */}
+    <ellipse cx="42" cy="42" rx="18" ry="30"
+      fill="#14a0c8"
+      transform="rotate(-45 42 42)"
+    />
+    {/* Top-right petal — indigo */}
+    <ellipse cx="78" cy="42" rx="18" ry="30"
+      fill="#3c3c8c"
+      transform="rotate(45 78 42)"
+    />
+    {/* Bottom-left petal — purple */}
+    <ellipse cx="42" cy="78" rx="18" ry="30"
+      fill="#783c78"
+      transform="rotate(45 42 78)"
+    />
+    {/* Bottom-right petal — deep indigo */}
+    <ellipse cx="78" cy="78" rx="18" ry="30"
+      fill="#252568"
+      transform="rotate(-45 78 78)"
+    />
+  </svg>
+);
+
+/* ── Feature list items ─────────────────────────────────────── */
+const features = [
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+    ),
+    title: 'Unified Incident Tracking',
+    desc:  'Log, assign, and resolve incidents across IT, HR, Admin, Facilities, and Finance.',
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    ),
+    title: 'SLA Monitoring',
+    desc:  'Real-time breach detection with automated escalation alerts.',
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+        <path d="M16 3.13a4 4 0 010 7.75"/>
+      </svg>
+    ),
+    title: 'Role-Based Access',
+    desc:  'Tailored dashboards for Employees, Support Staff, Managers, and Admins.',
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6"  y1="20" x2="6"  y2="14"/>
+      </svg>
+    ),
+    title: 'Analytics & Reports',
+    desc:  'Department KPIs, SLA compliance, and exportable CSV reports.',
+  },
+];
+
+/* ── Decorative background shapes ──────────────────────────── */
+const BackgroundShapes = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+    {/* Large blurred circle — top right */}
+    <div
+      className="absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-20"
+      style={{ background: 'radial-gradient(circle, #14a0c8 0%, transparent 70%)' }}
+    />
+    {/* Medium blurred circle — bottom left */}
+    <div
+      className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full opacity-15"
+      style={{ background: 'radial-gradient(circle, #783c78 0%, transparent 70%)' }}
+    />
+    {/* Subtle grid pattern */}
+    <div
+      className="absolute inset-0 opacity-5"
+      style={{
+        backgroundImage:
+          'linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), ' +
+          'linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)',
+        backgroundSize: '40px 40px',
+      }}
+    />
+  </div>
+);
+
+/* ── Page ───────────────────────────────────────────────────── */
+const LoginPage = () => {
+  return (
+    <div className="min-h-screen flex">
+
+      {/* ══════════════════════════════════════
+          LEFT PANEL — Branding
+      ══════════════════════════════════════ */}
+      <div
+        className="hidden lg:flex lg:w-[52%] xl:w-[55%] flex-col justify-between p-12 relative"
+        style={{
+          background:
+            'linear-gradient(140deg, #1a1a4e 0%, #3c3c8c 45%, #5a3070 75%, #783c78 100%)',
+        }}
+      >
+        <BackgroundShapes />
+
+        {/* Top — Logo + wordmark */}
+        <div className="relative z-10">
+          <div className="flex items-center gap-4 mb-2">
+            <img src={pratitiLogo} alt="Pratiti Logo" width={70} height={70} />
+            <div>
+              <p className="text-white/50 text-xs tracking-[0.18em] uppercase font-medium">
+                Pratiti Technologies
+              </p>
+              <h1 className="text-white text-xl font-semibold tracking-tight leading-tight">
+                Internal Incident<br />Management Portal
+              </h1>
+            </div>
+          </div>
+        </div>
+
+        {/* Centre — Hero text + feature list */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-md">
+          <div className="mb-10">
+            <h2 className="text-white text-3xl xl:text-4xl font-semibold leading-tight tracking-tight mb-4">
+              One portal for every<br />
+              <span
+                className="font-light"
+                style={{ color: '#28b8dc' }}
+              >
+                incident, resolved.
+              </span>
+            </h2>
+            <p className="text-white/60 text-sm leading-relaxed max-w-sm">
+              Streamline how your organisation reports, tracks, and resolves
+              internal issues — with full visibility at every level.
+            </p>
+          </div>
+
+          {/* Feature list */}
+          <ul className="space-y-4">
+            {features.map((f, i) => (
+              <li
+                key={f.title}
+                className="flex items-start gap-3.5 animate-slide-up"
+                style={{ animationDelay: `${i * 0.08}s` }}
+              >
+                <span
+                  className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5"
+                  style={{ background: 'rgba(255,255,255,0.12)', color: '#28b8dc' }}
+                >
+                  {f.icon}
+                </span>
+                <div>
+                  <p className="text-white text-sm font-medium leading-snug">{f.title}</p>
+                  <p className="text-white/50 text-xs leading-relaxed mt-0.5">{f.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════
+          RIGHT PANEL — Login form
+      ══════════════════════════════════════ */}
+      <div className="flex-1 flex flex-col bg-gray-50">
+
+        {/* Mobile-only top bar */}
+        <div className="lg:hidden flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white">
+          <PratitiLogo className="w-8 h-8" />
+          <div>
+            <p className="text-xs text-gray-500 leading-none">Pratiti Technologies</p>
+            <p className="text-sm font-semibold text-indigo-800 leading-snug">IIMP</p>
+          </div>
+        </div>
+
+        {/* Form area */}
+        <div className="flex-1 flex items-center justify-center px-6 py-10">
+          <div className="w-full max-w-sm">
+
+            {/* Heading */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 tracking-tight animate-slide-up">
+                Welcome back
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 animate-slide-up animate-slide-up-delay-1">
+                Sign in with your corporate credentials to continue.
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div className="mb-7 animate-slide-up animate-slide-up-delay-2">
+              <div className="h-px bg-gradient-to-r from-indigo-200 via-purple-200 to-cyan-200" />
+            </div>
+
+            {/* The form */}
+            <LoginForm />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 text-center">
+          <p className="text-xs text-gray-400">
+            © {new Date().getFullYear()} Pratiti Technologies Pvt. Ltd.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+export default LoginPage;
