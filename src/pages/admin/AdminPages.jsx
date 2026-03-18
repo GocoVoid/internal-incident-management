@@ -7,6 +7,8 @@ import {
   SystemKPICards, UserManagementTable,
   RecategorizePanel, SLAConfigPanel,
 } from '../../components/admin/AdminComponents';
+import TicketDetailModal from '../../components/shared/TicketDetailModal';
+import useTicketDetail from '../../hooks/useTicketDetail';
 import { MOCK_REPORTS, MOCK_USERS, STATUSES, PRIORITIES, CATEGORIES } from '../../data/mockData';
 import { useNavigate } from 'react-router-dom';
 
@@ -39,7 +41,9 @@ const useChart = (ref, config, deps = []) => {
 export const AdminOverview = () => {
   const { user }   = useAuthContext();
   const navigate   = useNavigate();
-  const { tickets, stats } = useTickets(user?.id, 'ADMIN');
+  const { tickets, stats, updateStatus, assignTicket, addComment, recategorize } =
+    useTickets(user?.id, 'ADMIN');
+  const { selected, openTicket, closeTicket } = useTicketDetail();
   const othersCount = tickets.filter(t => t.category === 'Others').length;
 
   return (
@@ -87,6 +91,13 @@ export const AdminOverview = () => {
           ))}
         </div>
       </div>
+
+      <TicketDetailModal
+        ticket={selected} isOpen={!!selected} onClose={closeTicket}
+        role={user?.role} user={user}
+        onUpdateStatus={updateStatus} onAssign={assignTicket}
+        onAddComment={addComment} onRecategorize={recategorize}
+      />
     </DashboardLayout>
   );
 };
@@ -96,7 +107,9 @@ export const AdminOverview = () => {
 ══════════════════════════════════════ */
 export const AdminTickets = () => {
   const { user } = useAuthContext();
-  const { tickets, filters, updateFilter, clearFilters } = useTickets(user?.id, 'ADMIN');
+  const { tickets, filters, updateFilter, clearFilters, updateStatus, assignTicket, addComment, recategorize } =
+    useTickets(user?.id, 'ADMIN');
+  const { selected, openTicket, closeTicket } = useTicketDetail();
 
   const formatDate = iso => new Date(iso).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -151,9 +164,10 @@ export const AdminTickets = () => {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {tickets.map(t => (
-                  <tr key={t.id} className="hover:bg-indigo-50/20 transition-colors">
-                    <td className="px-4 py-3 font-mono font-medium" style={{ color: '#3c3c8c' }}>{t.id}</td>
-                    <td className="px-4 py-3 max-w-[180px]"><p className="truncate font-medium text-gray-800">{t.title}</p></td>
+                  <tr key={t.id} onClick={() => openTicket(t)}
+                    className="hover:bg-indigo-50/20 transition-colors cursor-pointer group">
+                    <td className="px-4 py-3 font-mono font-medium group-hover:text-indigo-700 transition-colors" style={{ color: '#3c3c8c' }}>{t.id}</td>
+                    <td className="px-4 py-3 max-w-[180px]"><p className="truncate font-medium text-gray-800 group-hover:text-indigo-700 transition-colors">{t.title}</p></td>
                     <td className="px-4 py-3 text-gray-600">{t.category}</td>
                     <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
                     <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
@@ -177,6 +191,13 @@ export const AdminTickets = () => {
           </div>
         </div>
       </div>
+
+      <TicketDetailModal
+        ticket={selected} isOpen={!!selected} onClose={closeTicket}
+        role={user?.role} user={user}
+        onUpdateStatus={updateStatus} onAssign={assignTicket}
+        onAddComment={addComment} onRecategorize={recategorize}
+      />
     </DashboardLayout>
   );
 };

@@ -1,0 +1,28 @@
+/**
+ * slaService.js
+ *
+ * SLA configuration API calls.
+ * Schema: id, priority, resolution_time_hours
+ *
+ * One row per priority level: Low | Medium | High | Critical
+ * Stored per-incident at creation time via sla_id FK.
+ */
+
+import { get, put } from './apiClient';
+
+/**
+ * GET /sla-config
+ * Returns: [{ id, priority, resolutionTimeHours }]
+ * Used by: Admin SLA Config page, incident creation logic (server-side)
+ */
+export const getSLAConfig = () =>
+  get('/sla-config');
+
+/**
+ * PUT /sla-config/:id   (ADMIN only)
+ * Body: { resolutionTimeHours }
+ * Updates the resolution time for a specific priority row.
+ * Note: changing SLA config does NOT retroactively update open incidents.
+ */
+export const updateSLAConfig = (id, resolutionTimeHours) =>
+  put(`/sla-config/${id}`, { resolutionTimeHours });

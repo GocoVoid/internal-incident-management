@@ -2,16 +2,20 @@ import React, { useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { DeptKPICards, SLAHeatmap } from '../../components/manager/ManagerComponents';
 import CreateTicketModal from '../../components/employee/CreateTicketModal';
+import TicketDetailModal from '../../components/shared/TicketDetailModal';
 import { useAuthContext } from '../../context/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
+import useTicketDetail from '../../hooks/useTicketDetail';
 import { StatusBadge, PriorityBadge } from '../../components/shared/TicketBadge';
 import { useNavigate } from 'react-router-dom';
 
 const ManagerOverview = () => {
   const { user }   = useAuthContext();
   const navigate   = useNavigate();
-  const { tickets, stats, createTicket } = useTickets(user?.id, 'MANAGER');
+  const { tickets, stats, createTicket, updateStatus, assignTicket, addComment, recategorize } =
+    useTickets(user?.id, 'MANAGER');
   const [showCreate, setShowCreate] = useState(false);
+  const { selected, openTicket, closeTicket } = useTicketDetail();
 
   return (
     <DashboardLayout title="Overview">
@@ -36,16 +40,14 @@ const ManagerOverview = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <SLAHeatmap tickets={tickets} />
-
-          {/* Quick actions */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Quick Actions</h3>
             <div className="space-y-2">
               {[
-                { label: 'Assign open tickets', desc: `${stats.open} ticket${stats.open !== 1 ? 's' : ''} waiting for assignment`, to: '/dashboard/manager/assign', color: '#3c3c8c' },
-                { label: 'View all dept tickets', desc: `${stats.total} total tickets`, to: '/dashboard/manager/tickets', color: '#14a0c8' },
-                { label: 'View reports', desc: 'SLA compliance & volume trends', to: '/dashboard/manager/reports', color: '#783c78' },
-              ].map(a => (
+                { label: 'Assign open tickets',  desc: `${stats.open} ticket${stats.open !== 1 ? 's' : ''} waiting`, to: '/dashboard/manager/assign',  color: '#3c3c8c' },
+                { label: 'View all dept tickets', desc: `${stats.total} total tickets`,                               to: '/dashboard/manager/tickets', color: '#14a0c8' },
+                { label: 'View reports',          desc: 'SLA compliance & volume trends',                            to: '/dashboard/manager/reports', color: '#783c78' },
+              ].map((a) => (
                 <button key={a.label} onClick={() => navigate(a.to)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all text-left group">
                   <div>
@@ -62,20 +64,19 @@ const ManagerOverview = () => {
           </div>
         </div>
 
-        {/* Recent tickets */}
+        {/* Recent tickets — clickable */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm overflow-hidden">
           <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #f3f4f6' }}>
             <h3 className="text-sm font-semibold text-gray-900">Recent Activity</h3>
             <button onClick={() => navigate('/dashboard/manager/tickets')}
-              className="text-xs font-medium hover:underline" style={{ color: '#14a0c8' }}>
-              View all →
-            </button>
+              className="text-xs font-medium hover:underline" style={{ color: '#14a0c8' }}>View all →</button>
           </div>
           <ul className="divide-y divide-gray-50">
-            {tickets.slice(0, 5).map(t => (
-              <li key={t.id} className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors">
-                <span className="font-mono text-xs font-medium w-36 shrink-0" style={{ color: '#3c3c8c' }}>{t.id}</span>
-                <span className="flex-1 text-sm text-gray-700 truncate">{t.title}</span>
+            {tickets.slice(0, 5).map((t) => (
+              <li key={t.id} onClick={() => openTicket(t)}
+                className="flex items-center gap-4 px-5 py-3 hover:bg-indigo-50/30 transition-colors cursor-pointer group">
+                <span className="font-mono text-xs font-medium w-36 shrink-0 group-hover:text-indigo-700 transition-colors" style={{ color: '#3c3c8c' }}>{t.id}</span>
+                <span className="flex-1 text-sm text-gray-700 truncate group-hover:text-indigo-700 transition-colors">{t.title}</span>
                 <PriorityBadge priority={t.priority} />
                 <StatusBadge status={t.status} />
               </li>
@@ -85,6 +86,12 @@ const ManagerOverview = () => {
       </div>
 
       <CreateTicketModal isOpen={showCreate} onClose={() => setShowCreate(false)} onSubmit={createTicket} />
+      <TicketDetailModal
+        ticket={selected} isOpen={!!selected} onClose={closeTicket}
+        role={user?.role} user={user}
+        onUpdateStatus={updateStatus} onAssign={assignTicket}
+        onAddComment={addComment} onRecategorize={recategorize}
+      />
     </DashboardLayout>
   );
 };

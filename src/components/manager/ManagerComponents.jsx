@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { StatusBadge, PriorityBadge } from '../shared/TicketBadge';
+import TicketDetailModal from '../shared/TicketDetailModal';
+import useTicketDetail from '../../hooks/useTicketDetail';
+import { useAuthContext } from '../../context/AuthContext';
+import { useTickets } from '../../hooks/useTickets';
 import { MOCK_USERS, MOCK_REPORTS } from '../../data/mockData';
 
 /* ══════════════════════════════════════
@@ -32,49 +36,75 @@ export const DeptKPICards = ({ stats }) => {
    SLA Heatmap
 ══════════════════════════════════════ */
 export const SLAHeatmap = ({ tickets }) => {
-  const breached    = tickets.filter((t) => t.isSlaBreached);
-  const atRisk      = tickets.filter((t) => {
+  const { user } = useAuthContext();
+  const { updateStatus, assignTicket, addComment, recategorize } =
+    useTickets(user?.id, 'MANAGER');
+  const { selected, openTicket, closeTicket } = useTicketDetail();
+
+  const breached = tickets.filter((t) => t.isSlaBreached);
+  const atRisk   = tickets.filter((t) => {
     if (t.isSlaBreached || !t.slaDueAt) return false;
     return new Date(t.slaDueAt) - Date.now() < 2 * 3600000;
   });
-  const onTrack     = tickets.filter((t) => {
+  const onTrack  = tickets.filter((t) => {
     if (t.isSlaBreached || !t.slaDueAt) return false;
     return new Date(t.slaDueAt) - Date.now() >= 2 * 3600000;
   });
 
   const rows = [
-    { label: 'Breached', items: breached, ring: 'border-red-300 bg-red-50',    dot: 'bg-red-500',    text: 'text-red-700'    },
+    { label: 'Breached', items: breached, ring: 'border-red-300 bg-red-50',       dot: 'bg-red-500',    text: 'text-red-700'    },
     { label: 'At Risk',  items: atRisk,   ring: 'border-orange-300 bg-orange-50', dot: 'bg-orange-400', text: 'text-orange-700' },
     { label: 'On Track', items: onTrack,  ring: 'border-green-200 bg-green-50',   dot: 'bg-green-500',  text: 'text-green-700'  },
   ];
 
+  /* Find full ticket object by id for modal */
+  const getTicket = (id) => tickets.find((t) => t.id === id);
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">SLA Heatmap</h3>
-      <div className="space-y-4">
-        {rows.map((row) => (
-          <div key={row.label}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`w-2 h-2 rounded-full ${row.dot}`} />
-              <span className={`text-xs font-medium ${row.text}`}>{row.label}</span>
-              <span className="text-xs text-gray-400">({row.items.length})</span>
-            </div>
-            {row.items.length === 0 ? (
-              <p className="text-xs text-gray-400 pl-4">None</p>
-            ) : (
-              <div className="flex flex-wrap gap-2 pl-4">
-                {row.items.map((t) => (
-                  <span key={t.id}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono border ${row.ring} ${row.text}`}>
-                    {t.id}
-                  </span>
-                ))}
+    <>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">SLA Heatmap</h3>
+        <div className="space-y-4">
+          {rows.map((row) => (
+            <div key={row.label}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`w-2 h-2 rounded-full ${row.dot}`} />
+                <span className={`text-xs font-medium ${row.text}`}>{row.label}</span>
+                <span className="text-xs text-gray-400">({row.items.length})</span>
               </div>
-            )}
-          </div>
-        ))}
+              {row.items.length === 0 ? (
+                <p className="text-xs text-gray-400 pl-4">None</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 pl-4">
+                  {row.items.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => openTicket(getTicket(t.id))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono border transition-all hover:scale-105 hover:shadow-sm ${row.ring} ${row.text}`}
+                      title={t.title}
+                    >
+                      {t.id}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+
+      <TicketDetailModal
+        ticket={selected}
+        isOpen={!!selected}
+        onClose={closeTicket}
+        role={user?.role}
+        user={user}
+        onUpdateStatus={updateStatus}
+        onAssign={assignTicket}
+        onAddComment={addComment}
+        onRecategorize={recategorize}
+      />
+    </>
   );
 };
 

@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { StatusBadge, PriorityBadge } from '../shared/TicketBadge';
 import Modal from '../shared/Modal';
+import TicketDetailModal from '../shared/TicketDetailModal';
+import useTicketDetail from '../../hooks/useTicketDetail';
+import { useAuthContext } from '../../context/AuthContext';
+import { useTickets } from '../../hooks/useTickets';
 import { MOCK_SLA_CONFIG, MOCK_REPORTS, CATEGORIES, PRIORITIES } from '../../data/mockData';
 
 /* ══════════════════════════════════════
@@ -215,6 +219,10 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
    Re-categorize Others Tickets
 ══════════════════════════════════════ */
 export const RecategorizePanel = ({ tickets, onRecategorize }) => {
+  const { user }   = useAuthContext();
+  const { updateStatus, assignTicket, addComment } = useTickets(user?.id, 'ADMIN');
+  const { selected, openTicket, closeTicket } = useTicketDetail();
+
   const othersTickets = tickets.filter((t) => t.category === 'Others');
   const [selections, setSelections] = useState({});
   const [done,       setDone]       = useState({});
@@ -229,61 +237,76 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <h3 className="text-sm font-semibold text-gray-900">Re-categorize "Others" Tickets</h3>
-        {othersTickets.length > 0 && (
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-            {othersTickets.length} pending
-          </span>
-        )}
-      </div>
-
-      {othersTickets.length === 0 ? (
-        <div className="text-center py-8">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
-            className="w-8 h-8 text-gray-300 mx-auto mb-2">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          <p className="text-xs text-gray-400">No "Others" tickets pending re-categorization.</p>
+    <>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-sm font-semibold text-gray-900">Re-categorize "Others" Tickets</h3>
+          {othersTickets.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              {othersTickets.length} pending
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="space-y-3">
-          {othersTickets.map((t) => (
-            <div key={t.id} className={`p-4 rounded-xl border transition-colors
-              ${done[t.id] ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50/40'}`}>
-              <div className="flex items-start gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-xs text-indigo-600 font-medium">{t.id}</span>
-                    <PriorityBadge priority={t.priority} />
-                  </div>
-                  <p className="text-sm font-medium text-gray-800 mb-2">{t.title}</p>
-                  {done[t.id] ? (
-                    <div className="flex items-center gap-1.5 text-xs text-green-700">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                        className="w-3.5 h-3.5">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                      Re-categorized to <strong>{done[t.id]}</strong>. SLA clock started.
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <select value={selections[t.id] ?? ''}
-                        onChange={(e) => handleChange(t.id, e.target.value)}
-                        className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white">
-                        <option value="">Assign to department…</option>
-                        {CATEGORIES.filter((c) => c !== 'Others').map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                      <button onClick={() => handleApply(t.id)}
-                        disabled={!selections[t.id]}
-                        className="px-3 py-2 rounded-xl text-xs font-medium text-white bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 transition-colors whitespace-nowrap">
-                        Apply
+
+        {othersTickets.length === 0 ? (
+          <div className="text-center py-8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+              className="w-8 h-8 text-gray-300 mx-auto mb-2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <p className="text-xs text-gray-400">No "Others" tickets pending re-categorization.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {othersTickets.map((t) => (
+              <div key={t.id} className={`p-4 rounded-xl border transition-colors
+                ${done[t.id] ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50/40'}`}>
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {/* Clickable ticket ID opens detail modal */}
+                      <button
+                        onClick={() => openTicket(t)}
+                        className="font-mono text-xs font-medium hover:underline transition-colors"
+                        style={{ color: '#3c3c8c' }}
+                      >
+                        {t.id}
+                      </button>
+                      <PriorityBadge priority={t.priority} />
+                      <button
+                        onClick={() => openTicket(t)}
+                        className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-lg transition-colors"
+                        style={{ color: '#14a0c8', background: '#edf8fc', border: '1px solid #d6f0f8' }}
+                      >
+                        View details
                       </button>
                     </div>
-                  )}
+                    <p className="text-sm font-medium text-gray-800 mb-2">{t.title}</p>
+                    {done[t.id] ? (
+                      <div className="flex items-center gap-1.5 text-xs text-green-700">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                          className="w-3.5 h-3.5">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        Re-categorized to <strong>{done[t.id]}</strong>. SLA clock started.
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select value={selections[t.id] ?? ''}
+                          onChange={(e) => handleChange(t.id, e.target.value)}
+                          className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white">
+                          <option value="">Assign to department…</option>
+                          {CATEGORIES.filter((c) => c !== 'Others').map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                        <button onClick={() => handleApply(t.id)}
+                          disabled={!selections[t.id]}
+                          className="px-3 py-2 rounded-xl text-xs font-medium text-white bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 transition-colors whitespace-nowrap">
+                          Apply
+                        </button>
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -291,6 +314,19 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
         </div>
       )}
     </div>
+
+      <TicketDetailModal
+        ticket={selected}
+        isOpen={!!selected}
+        onClose={closeTicket}
+        role={user?.role}
+        user={user}
+        onUpdateStatus={updateStatus}
+        onAssign={assignTicket}
+        onAddComment={addComment}
+        onRecategorize={onRecategorize}
+      />
+    </>
   );
 };
 

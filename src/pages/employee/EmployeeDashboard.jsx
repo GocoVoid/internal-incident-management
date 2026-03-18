@@ -24,7 +24,7 @@ const EmployeeDashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Good {getGreeting()}, {user?.fullName?.split(' ')[0]} 👋
+              Good {getGreeting()}, {user?.fullName?.split(' ')[0]}
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
               Here's an overview of your incident tickets.

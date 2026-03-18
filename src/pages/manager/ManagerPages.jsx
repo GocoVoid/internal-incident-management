@@ -4,6 +4,8 @@ import { useAuthContext } from '../../context/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
 import { StatusBadge, PriorityBadge } from '../../components/shared/TicketBadge';
 import { AssignTicketPanel } from '../../components/manager/ManagerComponents';
+import TicketDetailModal from '../../components/shared/TicketDetailModal';
+import useTicketDetail from '../../hooks/useTicketDetail';
 import { MOCK_REPORTS, STATUSES, PRIORITIES, CATEGORIES } from '../../data/mockData';
 
 /* ══════════════════════════════════════
@@ -11,7 +13,9 @@ import { MOCK_REPORTS, STATUSES, PRIORITIES, CATEGORIES } from '../../data/mockD
 ══════════════════════════════════════ */
 export const ManagerTickets = () => {
   const { user } = useAuthContext();
-  const { tickets, filters, updateFilter, clearFilters } = useTickets(user?.id, 'MANAGER');
+  const { tickets, filters, updateFilter, clearFilters, updateStatus, assignTicket, addComment, recategorize } =
+    useTickets(user?.id, 'MANAGER');
+  const { selected, openTicket, closeTicket } = useTicketDetail();
 
   const formatDate = (iso) => new Date(iso).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -65,9 +69,10 @@ export const ManagerTickets = () => {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {tickets.map(t => (
-                  <tr key={t.id} className="hover:bg-indigo-50/20 transition-colors">
-                    <td className="px-4 py-3 font-mono font-medium" style={{ color: '#3c3c8c' }}>{t.id}</td>
-                    <td className="px-4 py-3 max-w-[200px]"><p className="truncate text-gray-800 font-medium">{t.title}</p></td>
+                  <tr key={t.id} onClick={() => openTicket(t)}
+                    className="hover:bg-indigo-50/20 transition-colors cursor-pointer group">
+                    <td className="px-4 py-3 font-mono font-medium group-hover:text-indigo-700 transition-colors" style={{ color: '#3c3c8c' }}>{t.id}</td>
+                    <td className="px-4 py-3 max-w-[200px]"><p className="truncate text-gray-800 font-medium group-hover:text-indigo-700 transition-colors">{t.title}</p></td>
                     <td className="px-4 py-3 text-gray-600">{t.category}</td>
                     <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
                     <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
@@ -83,6 +88,13 @@ export const ManagerTickets = () => {
           </div>
         </div>
       </div>
+
+      <TicketDetailModal
+        ticket={selected} isOpen={!!selected} onClose={closeTicket}
+        role={user?.role} user={user}
+        onUpdateStatus={updateStatus} onAssign={assignTicket}
+        onAddComment={addComment} onRecategorize={recategorize}
+      />
     </DashboardLayout>
   );
 };
