@@ -5,7 +5,9 @@ import TicketDetailModal from '../shared/TicketDetailModal';
 import useTicketDetail from '../../hooks/useTicketDetail';
 import { useAuthContext } from '../../context/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
-import { MOCK_SLA_CONFIG, MOCK_REPORTS, CATEGORIES, PRIORITIES } from '../../data/mockData';
+import { useCategories } from '../../hooks/useCategories';
+import { useReports } from '../../hooks/useReports';
+import { getSLAConfig, updateSLAConfig } from '../../services/slaService';
 
 /* ══════════════════════════════════════
    System KPI Cards
@@ -38,7 +40,7 @@ const ROLE_OPTIONS = ['EMPLOYEE', 'SUPPORT_STAFF', 'MANAGER', 'ADMIN'];
 const DEPT_OPTIONS = ['IT', 'HR', 'Admin', 'Facilities', 'Finance'];
 const ROLE_LABELS  = { EMPLOYEE: 'Employee', SUPPORT_STAFF: 'Support Staff', MANAGER: 'Manager', ADMIN: 'Admin' };
 
-const NEW_USER_INIT = { fullName: '', email: '', username: '', role: '', department: '' };
+const NEW_USER_INIT = { name: '', email: '', role: '', department: '' };
 
 export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCreateUser }) => {
   const [search,    setSearch]    = useState('');
@@ -51,16 +53,16 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
   const filtered = users.filter((u) => {
     const q = search.toLowerCase();
     if (roleFilter && u.role !== roleFilter) return false;
-    if (q && !u.fullName.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+    if (q && !u.name?.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
     return true;
   });
 
   const openCreate = () => { setEditUser(null); setForm(NEW_USER_INIT); setErrors({}); setShowModal(true); };
-  const openEdit   = (u)  => { setEditUser(u);  setForm({ fullName: u.fullName, email: u.email, username: u.email.split('@')[0], role: u.role, department: u.department }); setErrors({}); setShowModal(true); };
+  const openEdit   = (u)  => { setEditUser(u);  setForm({ name: u.name ?? u.fullName, email: u.email, role: u.role, department: u.department }); setErrors({}); setShowModal(true); };
 
   const validate = () => {
     const e = {};
-    if (!form.fullName.trim()) e.fullName   = 'Required';
+    if (!form.name.trim())     e.name       = 'Required';
     if (!form.email.trim())    e.email      = 'Required';
     if (!form.role)            e.role       = 'Required';
     if (!form.department)      e.department = 'Required';
@@ -119,9 +121,9 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
                         style={{ background: 'linear-gradient(135deg,#3c3c8c,#783c78)' }}>
-                        {u.fullName.split(' ').map((n) => n[0]).join('').slice(0,2)}
+                        {(u.name ?? u.fullName ?? '?').split(' ').map((n) => n[0]).join('').slice(0,2)}
                       </div>
-                      <span className="font-medium text-gray-800">{u.fullName}</span>
+                      <span className="font-medium text-gray-800">{u.name ?? u.fullName}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
@@ -133,10 +135,10 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
                   <td className="px-4 py-3 text-gray-600">{u.department}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium
-                      ${u.status === 'ACTIVE'
+                      ${u.active
                         ? 'bg-green-50 text-green-700 border border-green-200'
                         : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
-                      {u.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                      {u.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -165,7 +167,7 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
         title={editUser ? 'Edit User' : 'Create New User'} size="sm">
         <div className="space-y-4">
           {[
-            { label: 'Full Name', key: 'fullName', type: 'text', placeholder: 'e.g. Arjun Mehta' },
+            { label: 'Full Name', key: 'name',  type: 'text',  placeholder: 'e.g. Arjun Mehta' },
             { label: 'Email',     key: 'email',    type: 'email', placeholder: 'arjun@pratiti.com' },
           ].map(({ label, key, type, placeholder }) => (
             <div key={key}>
@@ -222,6 +224,7 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
   const { user }   = useAuthContext();
   const { updateStatus, assignTicket, addComment } = useTickets(user?.id, 'ADMIN');
   const { selected, openTicket, closeTicket } = useTicketDetail();
+  const { categories } = useCategories();
 
   const othersTickets = tickets.filter((t) => t.category === 'Others');
   const [selections, setSelections] = useState({});
@@ -230,10 +233,11 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
   const handleChange = (id, val) => setSelections((p) => ({ ...p, [id]: val }));
 
   const handleApply = async (ticketId) => {
-    const cat = selections[ticketId];
-    if (!cat) return;
-    onRecategorize(ticketId, cat);
-    setDone((p) => ({ ...p, [ticketId]: cat }));
+    const catId = selections[ticketId];
+    if (!catId) return;
+    const cat = categories.find(c => String(c.id) === String(catId));
+    await onRecategorize(ticketId, Number(catId));
+    setDone((p) => ({ ...p, [ticketId]: cat?.categoryName ?? catId }));
   };
 
   return (
@@ -296,8 +300,8 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
                           onChange={(e) => handleChange(t.id, e.target.value)}
                           className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white">
                           <option value="">Assign to department…</option>
-                          {CATEGORIES.filter((c) => c !== 'Others').map((c) => (
-                            <option key={c} value={c}>{c}</option>
+                          {categories.filter(c => c.categoryName !== 'Others').map(c => (
+                            <option key={c.id} value={c.id}>{c.categoryName}</option>
                           ))}
                         </select>
                         <button onClick={() => handleApply(t.id)}
@@ -334,15 +338,24 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
    SLA Configuration Panel
 ══════════════════════════════════════ */
 export const SLAConfigPanel = () => {
-  const [config,  setConfig]  = useState(MOCK_SLA_CONFIG);
+  const [config,  setConfig]  = useState([]);
   const [editing, setEditing] = useState(null);
   const [saved,   setSaved]   = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleChange = (id, val) => {
-    setConfig((p) => p.map((c) => c.id === id ? { ...c, resolutionTimeHours: Number(val) } : c));
-  };
+  React.useEffect(() => {
+    getSLAConfig()
+      .then(data => setConfig(data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleChange = (id, val) =>
+    setConfig(p => p.map(c => c.id === id ? { ...c, resolutionTimeHours: Number(val) } : c));
 
   const handleSave = async () => {
+    const item = config.find(c => c.id === editing);
+    if (item) await updateSLAConfig(item.id, item.resolutionTimeHours);
     setSaved(true);
     setEditing(null);
     setTimeout(() => setSaved(false), 3000);
@@ -411,27 +424,31 @@ export const SLAConfigPanel = () => {
    System Reports + CSV Export
 ══════════════════════════════════════ */
 export const SystemReports = ({ tickets }) => {
-  const [period, setPeriod] = useState('Weekly');
+  const [range, setRange] = useState('week');
+  const { summary, ticketVolume, categoryBreakdown, slaCompliance, loading } = useReports(range);
+
+  const rangeLabel = { week: 'Weekly', month: 'Monthly', year: 'Yearly' };
+  const maxVal = Math.max(...ticketVolume.map(d => d.count), 1);
+  const maxCat = Math.max(...categoryBreakdown.map(d => d.count), 1);
+  const compliance = slaCompliance?.compliance ?? 0;
+  const CAT_COLORS = { IT:'bg-indigo-500',HR:'bg-purple-500',Admin:'bg-cyan-500',Facilities:'bg-amber-500',Finance:'bg-green-500',Others:'bg-gray-400' };
 
   const handleExport = () => {
     const headers = ['ID', 'Title', 'Category', 'Priority', 'Status', 'Created At', 'SLA Breached'];
-    const rows = tickets.map((t) => [
+    const rows = tickets.map(t => [
       t.id, `"${t.title}"`, t.category, t.priority, t.status,
       new Date(t.createdAt).toLocaleDateString('en-IN'),
       t.isSlaBreached ? 'Yes' : 'No',
     ]);
-    const csv = [headers, ...rows].map((r) => r.join(',')).join('\n');
+    const csv  = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url;
-    a.download = `IIMP_Report_${period}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `IIMP_Report_${rangeLabel[range]}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const data   = MOCK_REPORTS.ticketVolume;
-  const maxVal = Math.max(...data.map((d) => d.count));
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5 space-y-5">
@@ -439,11 +456,11 @@ export const SystemReports = ({ tickets }) => {
         <h3 className="text-sm font-semibold text-gray-900">System Reports</h3>
         <div className="flex items-center gap-3">
           <div className="flex rounded-xl overflow-hidden border border-gray-200">
-            {['Daily', 'Weekly', 'Monthly'].map((p) => (
-              <button key={p} onClick={() => setPeriod(p)}
+            {[['week','Weekly'],['month','Monthly'],['year','Yearly']].map(([val, label]) => (
+              <button key={val} onClick={() => setRange(val)}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors
-                  ${period === p ? 'bg-indigo-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
-                {p}
+                  ${range === val ? 'bg-indigo-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                {label}
               </button>
             ))}
           </div>
@@ -459,55 +476,55 @@ export const SystemReports = ({ tickets }) => {
         </div>
       </div>
 
-      {/* Summary row */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Total today',    value: MOCK_REPORTS.totalToday  },
-          { label: 'SLA compliance', value: `${MOCK_REPORTS.slaCompliance}%` },
-          { label: 'SLA breached',   value: MOCK_REPORTS.breachedCount },
-        ].map((s) => (
-          <div key={s.label} className="bg-indigo-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-indigo-700">{s.value}</p>
-            <p className="text-xs text-indigo-500 mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Volume chart */}
-      <div>
-        <p className="text-xs font-medium text-gray-600 mb-3">Ticket volume — {period}</p>
-        <div className="flex items-end gap-2 h-32">
-          {data.map((d) => (
-            <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-[10px] text-gray-500">{d.count}</span>
-              <div className="w-full rounded-t-lg"
-                style={{ height: `${(d.count / maxVal) * 96}px`, background: 'linear-gradient(to top,#3c3c8c,#6363b8)' }} />
-              <span className="text-[10px] text-gray-400">{d.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Category breakdown */}
-      <div>
-        <p className="text-xs font-medium text-gray-600 mb-3">By category</p>
-        <div className="space-y-2">
-          {MOCK_REPORTS.categoryBreakdown.map((c) => {
-            const max = Math.max(...MOCK_REPORTS.categoryBreakdown.map((x) => x.count));
-            const colors = { IT:'bg-indigo-500',HR:'bg-purple-500',Admin:'bg-cyan-500',Facilities:'bg-amber-500',Finance:'bg-green-500',Others:'bg-gray-400' };
-            return (
-              <div key={c.label} className="flex items-center gap-3">
-                <span className="text-xs text-gray-600 w-16 shrink-0">{c.label}</span>
-                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${colors[c.label]}`}
-                    style={{ width: `${(c.count / max) * 100}%` }} />
-                </div>
-                <span className="text-xs text-gray-500 w-6 text-right">{c.count}</span>
+      {loading ? (
+        <p className="text-xs text-gray-400 text-center py-4">Loading reports…</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Total today',    value: summary?.totalToday   ?? '—' },
+              { label: 'SLA compliance', value: `${compliance}%`             },
+              { label: 'SLA breached',   value: summary?.breachedCount ?? '—' },
+            ].map(s => (
+              <div key={s.label} className="bg-indigo-50 rounded-xl p-3 text-center">
+                <p className="text-xl font-bold text-indigo-700">{s.value}</p>
+                <p className="text-xs text-indigo-500 mt-0.5">{s.label}</p>
               </div>
-            );
-          })}
-        </div>
-      </div>
+            ))}
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-600 mb-3">Ticket volume — {rangeLabel[range]}</p>
+            <div className="flex items-end gap-2 h-32">
+              {ticketVolume.map(d => (
+                <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-[10px] text-gray-500">{d.count}</span>
+                  <div className="w-full rounded-t-lg"
+                    style={{ height: `${(d.count / maxVal) * 96}px`, background: 'linear-gradient(to top,#3c3c8c,#6363b8)' }} />
+                  <span className="text-[10px] text-gray-400">{d.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-600 mb-3">By category</p>
+            <div className="space-y-2">
+              {categoryBreakdown.map(c => (
+                <div key={c.label} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-600 w-16 shrink-0">{c.label}</span>
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${CAT_COLORS[c.label] ?? 'bg-gray-400'}`}
+                      style={{ width: `${(c.count / maxCat) * 100}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-500 w-6 text-right">{c.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
+

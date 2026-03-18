@@ -17,8 +17,8 @@ import { get, patch } from './apiClient';
  * Response: [{ id, message, isRead, createdAt }]
  * @param {Object} params - { isRead: boolean (optional), page, size }
  */
-export const getNotifications = (params = {}) =>
-  get('/notifications', params);
+export const getNotifications = (params = {id}) =>
+  get('/notifications/getAllNotifications', params);
 
 /**
  * GET /notifications/unread-count
@@ -26,7 +26,7 @@ export const getNotifications = (params = {}) =>
  * Used by Header bell icon badge.
  */
 export const getUnreadCount = () =>
-  get('/notifications/unread-count');
+  get('/notifications/count');
 
 /**
  * PATCH /notifications/:id/read

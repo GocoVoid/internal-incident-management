@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuthContext } from '../../context/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
+import { useCategories } from '../../hooks/useCategories';
 import { useNavigate } from 'react-router-dom';
-import { CATEGORIES, PRIORITIES } from '../../data/mockData';
+import { uploadAttachment } from '../../services/incidentService';
 
 const Field = ({ label, error, children, hint }) => (
   <div>
@@ -23,18 +24,23 @@ const EmployeeCreateTicket = () => {
   const { user }    = useAuthContext();
   const navigate    = useNavigate();
   const { createTicket } = useTickets(user?.id, 'EMPLOYEE');
+  const { categories, PRIORITIES, loading: catsLoading } = useCategories();
 
-  const [form,    setForm]    = useState({ title: '', category: '', priority: '', description: '' });
+  const [form,    setForm]    = useState({ title: '', categoryId: '', priority: '', description: '' });
   const [errors,  setErrors]  = useState({});
   const [files,   setFiles]   = useState([]);
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const selectedCategory = categories.find(c => String(c.id) === String(form.categoryId));
+  const isOthers = selectedCategory?.categoryName === 'Others';
 
   const validate = () => {
     const e = {};
     if (!form.title.trim() || form.title.length < 3) e.title = 'Title must be at least 3 characters.';
     if (form.title.length > 150)                     e.title = 'Title must be under 150 characters.';
-    if (!form.category)                              e.category = 'Please select a category.';
+    if (!form.categoryId)                            e.categoryId = 'Please select a category.';
     if (!form.priority)                              e.priority = 'Please select a priority.';
     if (form.description.trim().length < 20)         e.description = 'Description must be at least 20 characters.';
     return e;
@@ -44,6 +50,7 @@ const EmployeeCreateTicket = () => {
     const { name, value } = e.target;
     setForm(p => ({ ...p, [name]: value }));
     if (errors[name]) setErrors(p => ({ ...p, [name]: '' }));
+    setApiError('');
   };
 
   const handleFiles = (e) => {
@@ -58,11 +65,28 @@ const EmployeeCreateTicket = () => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
+
     setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
-    const ticket = createTicket({ ...form, attachments: files });
-    setSuccess(ticket.id);
-    setLoading(false);
+    setApiError('');
+    try {
+      const ticket = await createTicket({
+        title:       form.title,
+        description: form.description,
+        priority:    form.priority,
+        categoryId:  Number(form.categoryId),
+      });
+
+      /* Upload attachments sequentially after ticket creation */
+      for (const file of files) {
+        try { await uploadAttachment(ticket.id, file); } catch { /* non-fatal */ }
+      }
+
+      setSuccess(ticket.id);
+    } catch (err) {
+      setApiError(err?.message ?? 'Failed to create ticket. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (success) {
@@ -85,7 +109,7 @@ const EmployeeCreateTicket = () => {
               style={{ background: '#3c3c8c' }}>
               View My Tickets
             </button>
-            <button onClick={() => { setSuccess(''); setForm({ title:'',category:'',priority:'',description:'' }); setFiles([]); }}
+            <button onClick={() => { setSuccess(''); setForm({ title:'',categoryId:'',priority:'',description:'' }); setFiles([]); }}
               className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
               Create Another
             </button>
@@ -103,6 +127,17 @@ const EmployeeCreateTicket = () => {
           <p className="text-sm text-gray-500 mt-0.5">Describe your issue clearly so the right team can assist you.</p>
         </div>
 
+        {apiError && (
+          <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 animate-fade-in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mt-0.5 shrink-0">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p className="text-xs text-red-700">{apiError}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} noValidate
           className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-6 space-y-5">
 
@@ -113,10 +148,13 @@ const EmployeeCreateTicket = () => {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Category *" error={errors.category}>
-              <select name="category" value={form.category} onChange={handleChange} className={inputCls(errors.category)}>
-                <option value="">Select category</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            <Field label="Category *" error={errors.categoryId}>
+              <select name="categoryId" value={form.categoryId} onChange={handleChange}
+                className={inputCls(errors.categoryId)} disabled={catsLoading}>
+                <option value="">{catsLoading ? 'Loading…' : 'Select category'}</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>{c.categoryName}</option>
+                ))}
               </select>
             </Field>
             <Field label="Priority *" error={errors.priority}>
@@ -127,7 +165,7 @@ const EmployeeCreateTicket = () => {
             </Field>
           </div>
 
-          {form.category === 'Others' && (
+          {isOthers && (
             <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
               <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.8"
                 strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mt-0.5 shrink-0">
@@ -183,7 +221,6 @@ const EmployeeCreateTicket = () => {
             )}
           </div>
 
-          {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
             <button type="button" onClick={() => navigate('/dashboard/employee')}
               className="px-4 py-2.5 rounded-xl text-sm text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">

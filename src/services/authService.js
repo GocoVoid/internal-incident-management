@@ -58,6 +58,9 @@ export const refreshAccessToken = (refreshToken) =>
 export const changePassword = (email,oldPassword, newPassword, otpCode, purpose) =>
   rawPost('/auth/change-password', { email, oldPassword, newPassword, otpCode, purpose });
 
+export const forgotPassword = (email, newPassword, otpCode, purpose) =>
+rawPost('/auth/forgot-password', { email, newPassword, otpCode, purpose });
+
 /** POST /auth/send-otp */
 export const sendOtp = (email, purpose) =>
   rawPost('/auth/send-otp', { email, purpose });

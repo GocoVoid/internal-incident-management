@@ -14,7 +14,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { changePassword, login, sendOtp, verifyOtp } from '../services/authService';
+import { changePassword, forgotPassword, login, sendOtp, verifyOtp } from '../services/authService';
 import { useAuthContext } from '../context/AuthContext';
 
 const MAX_ATTEMPTS    = 5;
@@ -228,7 +228,12 @@ export const useAuth = () => {
     setOtpError('');
 
     try {
-      await changePassword(email,cpFields.oldPassword, cpFields.newPassword, otpCode, purpose);
+      if (purpose=='FORGOT_PASSWORD') {
+        await forgotPassword(email, cpFields.newPassword, otpCode, purpose);
+      }
+      else {
+        await changePassword(email, cpFields.oldPassword, cpFields.newPassword, otpCode, purpose);
+      }
 
       /* Success — go back to login with a success banner */
       const msg = purpose === 'NEW_LOGIN'

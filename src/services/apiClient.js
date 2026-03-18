@@ -18,7 +18,7 @@ import {
 } from '../utils/tokenUtils';
 import { refreshAccessToken } from './authService';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.0.205:6969/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.0.205:1111/api';
 
 /* ── Track in-flight refresh to avoid duplicate calls ─────── */
 let isRefreshing       = false;
@@ -126,19 +126,19 @@ export const get  = (endpoint, params) => {
 export const post = (endpoint, body) =>
   request(endpoint, {
     method: 'POST',
-    body:   body instanceof FormData ? body : JSON.stringify(body),
+    ...(body !== undefined && { body: body instanceof FormData ? body : JSON.stringify(body) }),
   });
 
 export const put = (endpoint, body) =>
   request(endpoint, {
     method: 'PUT',
-    body:   body instanceof FormData ? body : JSON.stringify(body),
+    ...(body !== undefined && { body: body instanceof FormData ? body : JSON.stringify(body) }),
   });
 
 export const patch = (endpoint, body) =>
   request(endpoint, {
     method: 'PATCH',
-    body:   body instanceof FormData ? body : JSON.stringify(body),
+    ...(body !== undefined && { body: body instanceof FormData ? body : JSON.stringify(body) }),
   });
 
 export const del = (endpoint) =>

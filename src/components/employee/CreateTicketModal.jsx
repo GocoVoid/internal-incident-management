@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Modal from '../shared/Modal';
-import { CATEGORIES, PRIORITIES } from '../../data/mockData';
+import { useCategories } from '../../hooks/useCategories';
 
 const INITIAL = { title: '', category: '', priority: '', description: '' };
 
@@ -20,6 +20,7 @@ const inputCls = (err) =>
   }`;
 
 const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
+  const { categories, categoryNames: CATEGORIES, PRIORITIES } = useCategories();
   const [form,    setForm]    = useState(INITIAL);
   const [errors,  setErrors]  = useState({});
   const [loading, setLoading] = useState(false);
@@ -61,7 +62,8 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
 
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600)); // simulate API
-    onSubmit({ ...form, attachments: files });
+    const categoryObj = categories.find(c => c.categoryName === form.category);
+    onSubmit({ ...form, categoryId: categoryObj?.id ?? null, attachments: files });
     setForm(INITIAL);
     setFiles([]);
     setErrors({});

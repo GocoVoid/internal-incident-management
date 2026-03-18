@@ -52,7 +52,6 @@ const AdminDashboard = () => {
         {/* Header */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900">System Overview</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Full visibility across all departments and incidents.</p>
         </div>
 
         {/* KPI cards — always visible */}

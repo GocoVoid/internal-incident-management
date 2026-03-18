@@ -18,7 +18,7 @@ import { get, post, patch, put } from './apiClient';
  * @param {Object} params - { role, department, isActive, search, page, size }
  */
 export const getUsers = (params = {}) =>
-  get('/users', params);
+  get('/admin/getAllUsers', params);
 
 /**
  * GET /users/:id
@@ -36,7 +36,7 @@ export const getUserById = (id) =>
  * Server sets: is_first_login=true, generates temp password, sends notification
  */
 export const createUser = (data) =>
-  post('/users', data);
+  post('/admin/createUser', data);
 
 /**
  * PUT /users/:id

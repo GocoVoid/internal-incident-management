@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthContext } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { MOCK_NOTIFICATIONS } from '../../data/mockData';
+import { useNotifications } from '../../hooks/useNotifications';
 
 /* ── Icons ───────────────────────────────────────────────────── */
 const BellIcon = () => (
@@ -48,10 +48,9 @@ const Header = ({ title }) => {
   const { user, handleLogout }  = useAuthContext();
   const navigate                = useNavigate();
   const [showNotifs, setShowNotifs] = useState(false);
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const { notifications, unreadCount: unread, markRead, markAllRead: markAllReadApi } = useNotifications();
 
-  const unread      = notifications.filter(n => !n.isRead).length;
-  const markAllRead = () => setNotifications(p => p.map(n => ({ ...n, isRead: true })));
+  const markAllRead = () => markAllReadApi();
   const onLogout    = () => { handleLogout(); navigate('/login', { replace: true }); };
 
   const initials = user?.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? 'U';
