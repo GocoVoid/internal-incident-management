@@ -33,14 +33,16 @@ const NAV_ITEMS = {
     { label: 'Create Ticket', to: '/dashboard/employee/create',  icon: <Icons.Plus /> },
   ],
   SUPPORT_STAFF: [
-    { label: 'Overview', to: '/dashboard/support',       icon: <Icons.Grid />,  end: true },
-    { label: 'My Queue', to: '/dashboard/support/queue', icon: <Icons.Clock /> },
+    { label: 'Overview',      to: '/dashboard/support',          icon: <Icons.Grid />,   end: true },
+    { label: 'My Queue',      to: '/dashboard/support/queue',    icon: <Icons.Clock /> },
+    { label: 'Create Ticket', to: '/dashboard/employee/create',  icon: <Icons.Plus /> },
   ],
   MANAGER: [
-    { label: 'Overview', to: '/dashboard/manager',         icon: <Icons.Grid />,   end: true },
-    { label: 'Tickets',  to: '/dashboard/manager/tickets', icon: <Icons.Ticket /> },
-    { label: 'Assign',   to: '/dashboard/manager/assign',  icon: <Icons.Assign /> },
-    { label: 'Reports',  to: '/dashboard/manager/reports', icon: <Icons.Chart /> },
+    { label: 'Overview',      to: '/dashboard/manager',          icon: <Icons.Grid />,   end: true },
+    { label: 'Tickets',       to: '/dashboard/manager/tickets',  icon: <Icons.Ticket /> },
+    { label: 'Assign',        to: '/dashboard/manager/assign',   icon: <Icons.Assign /> },
+    { label: 'Reports',       to: '/dashboard/manager/reports',  icon: <Icons.Chart /> },
+    { label: 'Create Ticket', to: '/dashboard/employee/create',  icon: <Icons.Plus /> },
   ],
   ADMIN: [
     { label: 'Overview',      to: '/dashboard/admin',              icon: <Icons.Grid />,     end: true },
@@ -49,6 +51,7 @@ const NAV_ITEMS = {
     { label: 'Reports',       to: '/dashboard/admin/reports',      icon: <Icons.Chart /> },
     { label: 'SLA Config',    to: '/dashboard/admin/sla',          icon: <Icons.Settings /> },
     { label: 'Re-categorize', to: '/dashboard/admin/recategorize', icon: <Icons.Folder /> },
+    { label: 'Create Ticket', to: '/dashboard/employee/create',    icon: <Icons.Plus /> },
   ],
 };
 

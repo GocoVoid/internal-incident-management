@@ -323,7 +323,7 @@ const ChangePasswordStage = ({ auth }) => {
           />
           <FieldError msg={cpErrors.confirmPassword} />
           {/* Match indicator */}
-          {cpFields.newPassword===cpFields.confirmPassword && !cpErrors.confirmPassword && (
+          {cpFields.newPassword===cpFields.confirmPassword && cpFields.newPassword!=='' && !cpErrors.confirmPassword && (
             <p className="mt-1.5 text-xs text-green-600 flex items-center gap-1 animate-fade-in">
               <CheckCircleIcon className="w-3.5 h-3.5" /> Passwords match
             </p>

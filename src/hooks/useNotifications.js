@@ -14,7 +14,7 @@ export const useNotifications = () => {
         getUnreadCount(),
       ]);
       setNotifications(data?.content ?? data ?? []);
-      setUnreadCount(countRes?.count ?? 0);
+      setUnreadCount(countRes?.unread ?? 0);
     } catch {
       /* Non-critical — fail silently */
     } finally {

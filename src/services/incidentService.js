@@ -36,7 +36,7 @@ import { get, post, patch, del } from './apiClient';
  * @param {Object} params - { status, priority, categoryId, search, page, size }
  */
 export const getIncidents = (params = {}) =>
-  get('/incidents', params);
+  get('/incidents/getAllIncident', params);
 
 /**
  * GET /incidents/:incidentKey
@@ -47,11 +47,18 @@ export const getIncidentByKey = (incidentKey) =>
 
 /**
  * POST /incidents
- * Body: { title, description, priority, categoryId }
+ * Body: { title, description, priority, category }
+ *   priority → uppercased (e.g. "HIGH")
+ *   category → category name uppercased (e.g. "IT")
  * Server sets: createdBy (from JWT), status=Open, slaDueAt, incidentKey
  */
 export const createIncident = (data) =>
-  post('/incidents', data);
+  post('/incidents/createIncident', {
+    title:       data.title,
+    description: data.description,
+    priority:    data.priority?.toUpperCase(),
+    category:    data.category?.toUpperCase(),
+  });
 
 /**
  * PATCH /incidents/:incidentKey/status

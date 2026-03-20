@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuthContext } from '../../context/AuthContext';
-import { useTickets } from '../../hooks/useTickets';
-import { useCategories } from '../../hooks/useCategories';
+import { useAdminTickets } from '../../context/AdminTicketContext';
+import { CATEGORY_LIST } from '../../data/mockData';
 import { StatusBadge, PriorityBadge } from '../../components/shared/TicketBadge';
 import { SystemKPICards, UserManagementTable, RecategorizePanel, SLAConfigPanel } from '../../components/admin/AdminComponents';
 import TicketDetailModal from '../../components/shared/TicketDetailModal';
@@ -13,8 +13,8 @@ import { getUsers, toggleUserStatus, updateUser, createUser } from '../../servic
 import { getSLAConfig, updateSLAConfig } from '../../services/slaService';
 import { useNavigate } from 'react-router-dom';
 
-const STATUSES   = ['Open','In Progress','Resolved','Closed'];
-const PRIORITIES = ['Low','Medium','High','Critical'];
+const STATUSES   = ['Open', 'In Progress', 'Resolved', 'Closed'];
+const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
 const PALETTE    = ['#3c3c8c','#14a0c8','#783c78','#d97706','#059669','#9ca3af'];
 
 const useChartJS = () => {
@@ -44,7 +44,7 @@ export const AdminOverview = () => {
   const { user }   = useAuthContext();
   const navigate   = useNavigate();
   const { tickets, stats, loading, error, refetch, updateStatus, assignTicket, addComment, recategorize } =
-    useTickets(user?.id, 'ADMIN');
+    useAdminTickets();
   const { selected, openTicket, closeTicket } = useTicketDetail();
   const othersCount = tickets.filter(t => t.category === 'Others').length;
 
@@ -117,9 +117,7 @@ export const AdminOverview = () => {
 export const AdminTickets = () => {
   const { user } = useAuthContext();
   const { tickets, filters, loading, error, refetch, updateFilter, clearFilters,
-          updateStatus, assignTicket, addComment, recategorize } =
-    useTickets(user?.id, 'ADMIN');
-  const { categories } = useCategories();
+          updateStatus, assignTicket, addComment, recategorize } = useAdminTickets();
   const { selected, openTicket, closeTicket } = useTicketDetail();
 
   const formatDate = iso => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -156,7 +154,7 @@ export const AdminTickets = () => {
               </select>
               <select value={filters.category} onChange={e => updateFilter('category', e.target.value)} className={selCls}>
                 <option value="">All Category</option>
-                {categories.map(c => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
+                {CATEGORY_LIST.map(c => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
               </select>
               {Object.values(filters).some(Boolean) && (
                 <button onClick={clearFilters} className="text-xs font-medium" style={{ color: '#14a0c8' }}>Clear</button>
@@ -228,9 +226,9 @@ export const AdminUsers = () => {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  const handleToggleStatus = async (id, isActive) => {
-    await toggleUserStatus(id, isActive);
-    setUsers(p => p.map(u => u.id === id ? { ...u, isActive } : u));
+  const handleToggleStatus = async (id, active) => {
+    await toggleUserStatus(id, active);
+    setUsers(p => p.map(u => u.id === id ? { ...u, active } : u));
   };
 
   const handleUpdateUser = async (id, form) => {
@@ -269,9 +267,9 @@ export const AdminUsers = () => {
 export const AdminReports = () => {
   const [period, setPeriod] = useState('Weekly');
   const chartjsLoaded = useChartJS();
-  const barRef  = useRef();
-  const lineRef = useRef();
-  const doughRef= useRef();
+  const barRef   = useRef();
+  const lineRef  = useRef();
+  const doughRef = useRef();
 
   const [summary,  setSummary]  = useState(null);
   const [volume,   setVolume]   = useState([]);
@@ -287,14 +285,10 @@ export const AdminReports = () => {
         getTicketVolume({ range: period.toLowerCase() }),
         getCategoryBreakdown(),
       ]);
-      setSummary(s);
-      setVolume(v ?? []);
-      setCatBreak(c ?? []);
+      setSummary(s); setVolume(v ?? []); setCatBreak(c ?? []);
     } catch (e) {
       setRError(e?.message ?? 'Failed to load reports.');
-    } finally {
-      setRLoading(false);
-    }
+    } finally { setRLoading(false); }
   }, [period]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
@@ -458,8 +452,7 @@ export const AdminSLAConfig = () => {
    Admin Recategorize
 ══════════════════════════════════════ */
 export const AdminRecategorize = () => {
-  const { user }   = useAuthContext();
-  const { tickets, loading, error, refetch, recategorize } = useTickets(user?.id, 'ADMIN');
+  const { tickets, loading, error, refetch, recategorize } = useAdminTickets();
   const othersTickets = tickets.filter(t => t.category === 'Others');
 
   return (

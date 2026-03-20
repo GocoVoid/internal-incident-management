@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuthContext } from '../../context/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
-import { useCategories } from '../../hooks/useCategories';
+
 import { useNavigate } from 'react-router-dom';
 import { uploadAttachment } from '../../services/incidentService';
+import { CATEGORY_LIST, PRIORITIES } from '../../data/mockData';
 
 const Field = ({ label, error, children, hint }) => (
   <div>
@@ -24,23 +25,22 @@ const EmployeeCreateTicket = () => {
   const { user }    = useAuthContext();
   const navigate    = useNavigate();
   const { createTicket } = useTickets(user?.id, 'EMPLOYEE');
-  const { categories, PRIORITIES, loading: catsLoading } = useCategories();
 
-  const [form,    setForm]    = useState({ title: '', categoryId: '', priority: '', description: '' });
+  const [form,    setForm]    = useState({ title: '', category: '', priority: '', description: '' });
   const [errors,  setErrors]  = useState({});
   const [files,   setFiles]   = useState([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const selectedCategory = categories.find(c => String(c.id) === String(form.categoryId));
+  const selectedCategory = CATEGORY_LIST.find(c => c.categoryName === form.category);
   const isOthers = selectedCategory?.categoryName === 'Others';
 
   const validate = () => {
     const e = {};
     if (!form.title.trim() || form.title.length < 3) e.title = 'Title must be at least 3 characters.';
     if (form.title.length > 150)                     e.title = 'Title must be under 150 characters.';
-    if (!form.categoryId)                            e.categoryId = 'Please select a category.';
+    if (!form.category)                            e.category = 'Please select a category.';
     if (!form.priority)                              e.priority = 'Please select a priority.';
     if (form.description.trim().length < 20)         e.description = 'Description must be at least 20 characters.';
     return e;
@@ -73,7 +73,7 @@ const EmployeeCreateTicket = () => {
         title:       form.title,
         description: form.description,
         priority:    form.priority,
-        categoryId:  Number(form.categoryId),
+        category:    form.category,
       });
 
       /* Upload attachments sequentially after ticket creation */
@@ -109,7 +109,7 @@ const EmployeeCreateTicket = () => {
               style={{ background: '#3c3c8c' }}>
               View My Tickets
             </button>
-            <button onClick={() => { setSuccess(''); setForm({ title:'',categoryId:'',priority:'',description:'' }); setFiles([]); }}
+            <button onClick={() => { setSuccess(''); setForm({ title:'',category:'',priority:'',description:'' }); setFiles([]); }}
               className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
               Create Another
             </button>
@@ -148,12 +148,12 @@ const EmployeeCreateTicket = () => {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Category *" error={errors.categoryId}>
-              <select name="categoryId" value={form.categoryId} onChange={handleChange}
-                className={inputCls(errors.categoryId)} disabled={catsLoading}>
-                <option value="">{catsLoading ? 'Loading…' : 'Select category'}</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.categoryName}</option>
+            <Field label="Category *" error={errors.category}>
+              <select name="category" value={form.category} onChange={handleChange}
+                className={inputCls(errors.category)}>
+                <option value="">Select category</option>
+                {CATEGORY_LIST.map(c => (
+                  <option key={c.id} value={c.categoryName}>{c.categoryName}</option>
                 ))}
               </select>
             </Field>

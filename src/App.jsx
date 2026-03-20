@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
+import { AdminTicketProvider } from './context/AdminTicketContext';
 
 /* ── Pages ───────────────────────────────────────────────────── */
 import LoginPage            from './pages/LoginPage';
@@ -20,10 +21,11 @@ import { AdminOverview, AdminTickets, AdminUsers, AdminReports, AdminSLAConfig, 
 
 /* ── Guards ──────────────────────────────────────────────────── */
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user } = useAuthContext();
+  const { isAuthenticated, user, isFirstLogin } = useAuthContext();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user?.role))
     return <Navigate to="/login" replace />;
+  if (isFirstLogin) return <Navigate to="/login" replace />;
   return children;
 };
 
@@ -45,6 +47,15 @@ const P = (role, children) => (
   <ProtectedRoute allowedRoles={[role]}>{children}</ProtectedRoute>
 );
 
+/* ── Admin wrapper — single ticket fetch for all admin routes ── */
+const AdminRoute = ({ children }) => (
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <AdminTicketProvider>
+      {children}
+    </AdminTicketProvider>
+  </ProtectedRoute>
+);
+
 /* ── App ─────────────────────────────────────────────────────── */
 const AppRoutes = () => (
   <Routes>
@@ -53,9 +64,9 @@ const AppRoutes = () => (
     <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
 
     {/* Employee */}
-    <Route path="/dashboard/employee"        element={P('EMPLOYEE', <EmployeeOverview />)} />
+    <Route path="/dashboard/employee"         element={P('EMPLOYEE', <EmployeeOverview />)} />
     <Route path="/dashboard/employee/tickets" element={P('EMPLOYEE', <EmployeeTickets />)} />
-    <Route path="/dashboard/employee/create"  element={P('EMPLOYEE', <EmployeeCreateTicket />)} />
+    <Route path="/dashboard/employee/create"  element={<ProtectedRoute><EmployeeCreateTicket /></ProtectedRoute>} />
 
     {/* Support Staff */}
     <Route path="/dashboard/support"       element={P('SUPPORT_STAFF', <SupportOverview />)} />
@@ -67,13 +78,13 @@ const AppRoutes = () => (
     <Route path="/dashboard/manager/assign"  element={P('MANAGER', <ManagerAssign />)} />
     <Route path="/dashboard/manager/reports" element={P('MANAGER', <ManagerReports />)} />
 
-    {/* Admin */}
-    <Route path="/dashboard/admin"               element={P('ADMIN', <AdminOverview />)} />
-    <Route path="/dashboard/admin/tickets"       element={P('ADMIN', <AdminTickets />)} />
-    <Route path="/dashboard/admin/users"         element={P('ADMIN', <AdminUsers />)} />
-    <Route path="/dashboard/admin/reports"       element={P('ADMIN', <AdminReports />)} />
-    <Route path="/dashboard/admin/sla"           element={P('ADMIN', <AdminSLAConfig />)} />
-    <Route path="/dashboard/admin/recategorize"  element={P('ADMIN', <AdminRecategorize />)} />
+    {/* Admin — all wrapped in AdminTicketProvider */}
+    <Route path="/dashboard/admin"              element={<AdminRoute><AdminOverview /></AdminRoute>} />
+    <Route path="/dashboard/admin/tickets"      element={<AdminRoute><AdminTickets /></AdminRoute>} />
+    <Route path="/dashboard/admin/users"        element={<AdminRoute><AdminUsers /></AdminRoute>} />
+    <Route path="/dashboard/admin/reports"      element={<AdminRoute><AdminReports /></AdminRoute>} />
+    <Route path="/dashboard/admin/sla"          element={<AdminRoute><AdminSLAConfig /></AdminRoute>} />
+    <Route path="/dashboard/admin/recategorize" element={<AdminRoute><AdminRecategorize /></AdminRoute>} />
 
     <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes>

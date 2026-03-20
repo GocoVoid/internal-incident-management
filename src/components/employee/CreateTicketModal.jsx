@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Modal from '../shared/Modal';
-import { useCategories } from '../../hooks/useCategories';
+import { CATEGORY_LIST, PRIORITIES } from '../../data/mockData';
+
 
 const INITIAL = { title: '', category: '', priority: '', description: '' };
 
@@ -20,7 +21,7 @@ const inputCls = (err) =>
   }`;
 
 const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
-  const { categories, categoryNames: CATEGORIES, PRIORITIES } = useCategories();
+  
   const [form,    setForm]    = useState(INITIAL);
   const [errors,  setErrors]  = useState({});
   const [loading, setLoading] = useState(false);
@@ -62,8 +63,7 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
 
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600)); // simulate API
-    const categoryObj = categories.find(c => c.categoryName === form.category);
-    onSubmit({ ...form, categoryId: categoryObj?.id ?? null, attachments: files });
+    onSubmit({ ...form, attachments: files });
     setForm(INITIAL);
     setFiles([]);
     setErrors({});
@@ -98,7 +98,7 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
             <select name="category" value={form.category} onChange={handleChange}
               className={inputCls(errors.category)}>
               <option value="">Select category</option>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              {CATEGORY_LIST.map((c) => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
             </select>
           </Field>
 

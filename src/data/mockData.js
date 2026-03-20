@@ -17,10 +17,6 @@ export const MOCK_USERS = [
 
 export const CATEGORIES = ['IT', 'HR', 'Admin', 'Facilities', 'Finance', 'Others'];
 
-export const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
-
-export const STATUSES = ['Open', 'In Progress', 'Resolved', 'Closed'];
-
 export const MOCK_TICKETS = [
   {
     id: 'IIMP-2025-000001',
@@ -233,3 +229,17 @@ export const MOCK_REPORTS = {
   openCount: 9,
   breachedCount: 3,
 };
+
+/* ── Static category + priority + status constants ── */
+export const CATEGORY_LIST = [
+  { id: 1, categoryName: 'IT',         departmentName: 'IT'         },
+  { id: 2, categoryName: 'HR',         departmentName: 'HR'         },
+  { id: 3, categoryName: 'Admin',      departmentName: 'Admin'      },
+  { id: 4, categoryName: 'Facilities', departmentName: 'Facilities' },
+  { id: 5, categoryName: 'Finance',    departmentName: 'Finance'    },
+  { id: 6, categoryName: 'Others',     departmentName: 'Others'     },
+];
+
+export const CATEGORY_NAMES = CATEGORY_LIST.map(c => c.categoryName);
+export const PRIORITIES     = ['Low', 'Medium', 'High', 'Critical'];
+export const STATUSES       = ['Open', 'In Progress', 'Resolved', 'Closed'];

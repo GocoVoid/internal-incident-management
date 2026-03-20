@@ -20,11 +20,11 @@ export const useTickets = (_currentUserId, _role) => {
     dbId:            t.id,
     title:           t.title,
     description:     t.description,
-    category:        t.category?.categoryName ?? t.category ?? '',
+    //category:        t.category?.categoryName ?? t.category ?? '',
     categoryId:      t.category?.id           ?? t.categoryId ?? null,
-    department:      t.category?.departmentName ?? t.department ?? null,
+    department:      t.category?.departmentName ?? t.category ?? null,
     priority:        t.priority,
-    status:          t.status,
+    status:          t.status.replace({"OPEN":"Open","CLOSED":"Closed","RESOLVED":"Resolved","IN_PROGRESS":"In Progress"}),
     createdBy:       t.createdBy,
     createdByName:   t.createdByName  ?? t.createdBy?.name  ?? null,
     assignedTo:      t.assignedTo?.id ?? t.assignedTo       ?? null,
@@ -56,20 +56,23 @@ export const useTickets = (_currentUserId, _role) => {
     setLoading(true);
     setError(null);
     try {
-      const [ticketRes, statsRes] = await Promise.all([
-        api.getIncidents(),
-        api.getIncidentStats(),
-      ]);
+      console.log("Tickets Fetch Started");
+      const ticketRes = await api.getIncidents();
+      console.log("Tickets Fetch Done");
       const list = (ticketRes?.content ?? ticketRes ?? []).map(normalise);
       setTickets(list);
+      console.log("Fetching Stats");
+      const statsRes = await api.getIncidentStats();
+      console.log("Setting Stats");
       setStats({
-        total:      statsRes?.total      ?? list.length,
-        open:       statsRes?.open       ?? list.filter(t => t.status === 'Open').length,
-        inProgress: statsRes?.inProgress ?? list.filter(t => t.status === 'In Progress').length,
-        resolved:   statsRes?.resolved   ?? list.filter(t => t.status === 'Resolved').length,
-        closed:     statsRes?.closed     ?? list.filter(t => t.status === 'Closed').length,
-        breached:   statsRes?.breached   ?? list.filter(t => t.isSlaBreached).length,
+        total:      statsRes.totalAll,
+        open:       statsRes.open,
+        inProgress: statsRes.inProgress,
+        resolved:   statsRes.resolved,
+        closed:     statsRes.closed,
+        breached:   statsRes.slaBreached,
       });
+      console.log(stats);
     } catch (err) {
       setError(err?.message ?? 'Failed to load tickets.');
     } finally {
@@ -100,7 +103,7 @@ export const useTickets = (_currentUserId, _role) => {
       title:       data.title,
       description: data.description,
       priority:    data.priority,
-      categoryId:  data.categoryId,
+      category:    data.category,
     });
     const newTicket = normalise(res);
     setTickets(prev => [newTicket, ...prev]);

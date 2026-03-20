@@ -4,8 +4,9 @@ import Modal from '../shared/Modal';
 import TicketDetailModal from '../shared/TicketDetailModal';
 import useTicketDetail from '../../hooks/useTicketDetail';
 import { useAuthContext } from '../../context/AuthContext';
-import { useTickets } from '../../hooks/useTickets';
-import { useCategories } from '../../hooks/useCategories';
+import { useAdminTickets } from '../../context/AdminTicketContext';
+
+
 import { useReports } from '../../hooks/useReports';
 import { getSLAConfig, updateSLAConfig } from '../../services/slaService';
 
@@ -146,9 +147,9 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
                       <button onClick={() => openEdit(u)}
                         className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline">Edit</button>
                       <span className="text-gray-300">|</span>
-                      <button onClick={() => onToggleStatus(u.id)}
-                        className={`text-xs hover:underline ${u.status === 'ACTIVE' ? 'text-red-500 hover:text-red-600' : 'text-green-600 hover:text-green-700'}`}>
-                        {u.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                      <button onClick={() => onToggleStatus(u.id, !u.active)}
+                        className={`text-xs hover:underline ${u.active ? 'text-red-500 hover:text-red-600' : 'text-green-600 hover:text-green-700'}`}>
+                        {u.active ? 'Deactivate' : 'Reactivate'}
                       </button>
                     </div>
                   </td>
@@ -221,10 +222,10 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
    Re-categorize Others Tickets
 ══════════════════════════════════════ */
 export const RecategorizePanel = ({ tickets, onRecategorize }) => {
+  const { updateStatus, assignTicket, addComment } = useAdminTickets();
   const { user }   = useAuthContext();
-  const { updateStatus, assignTicket, addComment } = useTickets(user?.id, 'ADMIN');
+
   const { selected, openTicket, closeTicket } = useTicketDetail();
-  const { categories } = useCategories();
 
   const othersTickets = tickets.filter((t) => t.category === 'Others');
   const [selections, setSelections] = useState({});
@@ -235,7 +236,7 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
   const handleApply = async (ticketId) => {
     const catId = selections[ticketId];
     if (!catId) return;
-    const cat = categories.find(c => String(c.id) === String(catId));
+    const cat = CATEGORY_LIST.find(c => String(c.id) === String(catId));
     await onRecategorize(ticketId, Number(catId));
     setDone((p) => ({ ...p, [ticketId]: cat?.categoryName ?? catId }));
   };
@@ -300,7 +301,7 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
                           onChange={(e) => handleChange(t.id, e.target.value)}
                           className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white">
                           <option value="">Assign to department…</option>
-                          {categories.filter(c => c.categoryName !== 'Others').map(c => (
+                          {CATEGORY_LIST.filter(c => c.categoryName !== 'Others').map(c => (
                             <option key={c.id} value={c.id}>{c.categoryName}</option>
                           ))}
                         </select>

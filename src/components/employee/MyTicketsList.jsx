@@ -3,8 +3,9 @@ import { StatusBadge, PriorityBadge } from '../shared/TicketBadge';
 import EmptyState from '../shared/EmptyState';
 import TicketDetailModal from '../shared/TicketDetailModal';
 import { useAuthContext } from '../../context/AuthContext';
+import { CATEGORY_NAMES as CATEGORIES, PRIORITIES, STATUSES } from '../../data/mockData';
 import { useTickets } from '../../hooks/useTickets';
-import { useCategories } from '../../hooks/useCategories';
+
 
 const formatDate = (iso) => {
   if (!iso) return '—';
@@ -26,7 +27,6 @@ const SLACountdown = ({ slaDueAt, isSlaBreached, status }) => {
 const MyTicketsList = ({ tickets, filters, onFilterChange, onClearFilters, onCreateClick }) => {
   const { user } = useAuthContext();
   const { updateStatus, assignTicket, addComment, recategorize } = useTickets(user?.id, 'EMPLOYEE');
-  const { categoryNames: CATEGORIES, PRIORITIES, STATUSES } = useCategories();
   const [selected, setSelected] = useState(null);
   const hasActiveFilters = Object.values(filters).some(Boolean);
 

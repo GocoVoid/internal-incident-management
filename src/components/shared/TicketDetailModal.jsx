@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBadge, PriorityBadge } from './TicketBadge';
 import { useSupportStaff } from '../../hooks/useUsers';
-import { useCategories } from '../../hooks/useCategories';
+import { CATEGORY_LIST } from '../../data/mockData';
+
 import { getAuditLog } from '../../services/incidentService';
 
 /* ══════════════════════════════════════════════════════
@@ -152,7 +153,7 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
   const [success,  setSuccess]  = useState('');
 
   const { staff: supportStaff } = useSupportStaff(ticket.department);
-  const { categories }          = useCategories();
+  
 
   const flash = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3000); };
 
@@ -197,7 +198,7 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
     setLoading('recat');
     try {
       await onRecategorize(ticket.id, Number(newCatId));
-      const cat = categories.find(c => c.id === Number(newCatId));
+      const cat = CATEGORY_LIST.find(c => c.id === Number(newCatId));
       flash(`Re-categorized to ${cat?.categoryName}. SLA clock started.`);
       setNewCatId('');
     } finally { setLoading(''); }
@@ -271,7 +272,7 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
           <div className="flex gap-2">
             <select value={newCatId} onChange={e => setNewCatId(e.target.value)} className={selCls}>
               <option value="">Select category…</option>
-              {categories.filter(c => c.categoryName !== 'Others').map(c => (
+              {CATEGORY_LIST.filter(c => c.categoryName !== 'Others').map(c => (
                 <option key={c.id} value={c.id}>{c.categoryName}</option>
               ))}
             </select>

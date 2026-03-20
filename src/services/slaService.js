@@ -16,7 +16,7 @@ import { get, put } from './apiClient';
  * Used by: Admin SLA Config page, incident creation logic (server-side)
  */
 export const getSLAConfig = () =>
-  get('/sla-config');
+  get('/admin/getSLA');
 
 /**
  * PUT /sla-config/:id   (ADMIN only)
@@ -25,4 +25,4 @@ export const getSLAConfig = () =>
  * Note: changing SLA config does NOT retroactively update open incidents.
  */
 export const updateSLAConfig = (id, resolutionTimeHours) =>
-  put(`/sla-config/${id}`, { resolutionTimeHours });
+  put(`/admin/updateSLA`, { id,resolutionTimeHours });

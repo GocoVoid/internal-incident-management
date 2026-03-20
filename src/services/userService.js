@@ -43,7 +43,7 @@ export const createUser = (data) =>
  * Body: { name, email, role, department }
  */
 export const updateUser = (id, data) =>
-  put(`/users/${id}`, data);
+  put(`/admin/updateUserById/${id}`, data);
 
 /* ══════════════════════════════════════════════════════════
    Status Toggles  (ADMIN only)
@@ -54,8 +54,14 @@ export const updateUser = (id, data) =>
  * Body: { isActive: boolean }
  * Maps to DB: is_active
  */
-export const toggleUserStatus = (id, isActive) =>
-  patch(`/users/${id}/status`, { isActive });
+export const toggleUserStatus = (id, active) =>
+  {
+    if (!active) {
+      patch(`/admin/users/${id}/deactivate`);
+    } else {
+      patch(`/admin/users/${id}/reactivate`);
+    }
+  }
 
 /**
  * PATCH /users/:id/unlock
@@ -87,3 +93,9 @@ export const getSupportStaff = (department) =>
  */
 export const getMyProfile = () =>
   get('/users/me');
+
+
+
+
+
+

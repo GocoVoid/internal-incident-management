@@ -1,43 +1,17 @@
-/**
- * notificationService.js
- *
- * Notifications API calls.
- * Schema: id, user_id, message, is_read, otp_code (nullable), created_at
- *
- * Note: otp_code column is used internally by the backend for
- * first-login / password-reset OTP delivery. Never expose this
- * field in the frontend — the backend should strip it from list responses.
- */
-
 import { get, patch } from './apiClient';
 
-/**
- * GET /notifications
- * Returns notifications for the logged-in user (scoped by JWT).
- * Response: [{ id, message, isRead, createdAt }]
- * @param {Object} params - { isRead: boolean (optional), page, size }
- */
-export const getNotifications = (params = {id}) =>
-  get('/notifications/getAllNotifications', params);
+/** GET /notifications/getAllUnreadNotifications */
+export const getNotifications = () =>
+  get('/notifications/getAllUnreadNotifications');
 
-/**
- * GET /notifications/unread-count
- * Returns: { count: number }
- * Used by Header bell icon badge.
- */
+/** GET /notifications/count */
 export const getUnreadCount = () =>
   get('/notifications/count');
 
-/**
- * PATCH /notifications/:id/read
- * Marks a single notification as read (is_read = true).
- */
+/** PATCH /notifications/read/:id */
 export const markAsRead = (id) =>
-  patch(`/notifications/${id}/read`);
+  patch(`/notifications/read/${id}`);
 
-/**
- * PATCH /notifications/read-all
- * Marks all notifications for the current user as read.
- */
+/** PATCH /notifications/read-all */
 export const markAllAsRead = () =>
   patch('/notifications/read-all');
