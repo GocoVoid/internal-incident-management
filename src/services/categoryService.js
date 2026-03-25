@@ -15,24 +15,24 @@ import { get, post, put, del } from './apiClient';
  * Used to populate: Create Ticket dropdown, Recategorize dropdown, filter selects
  */
 export const getCategories = () =>
-  get('/categories');
+  get('/admin/categories');
 
 /**
  * POST /categories   (ADMIN only)
  * Body: { categoryName, departmentName }
  */
 export const createCategory = (data) =>
-  post('/categories', data);
+  post('/admin/categories', data);
 
 /**
  * PUT /categories/:id   (ADMIN only)
  * Body: { categoryName, departmentName }
  */
 export const updateCategory = (id, data) =>
-  put(`/categories/${id}`, data);
+  put(`/admin/categories/${id}`, data);
 
 /**
  * DELETE /categories/:id   (ADMIN only)
  */
 export const deleteCategory = (id) =>
-  del(`/categories/${id}`);
+  del(`/admin/categories/${id}`);

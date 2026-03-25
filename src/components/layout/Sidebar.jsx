@@ -19,10 +19,12 @@ const Icons = {
   Chart:        () => <Icon><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></Icon>,
   Settings:     () => <Icon><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></Icon>,
   Folder:       () => <Icon><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></Icon>,
+  Tag:          () => <Icon><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></Icon>,
   Assign:       () => <Icon><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></Icon>,
   Logout:       () => <Icon><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>,
   ChevronLeft:  () => <Icon><polyline points="15 18 9 12 15 6"/></Icon>,
   ChevronRight: () => <Icon><polyline points="9 18 15 12 9 6"/></Icon>,
+  MyTickets:    () => <Icon><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 11l1.5 1.5L21 9"/></Icon>,
 };
 
 /* ── Nav config per role ─────────────────────────────────────── */
@@ -30,28 +32,27 @@ const NAV_ITEMS = {
   EMPLOYEE: [
     { label: 'Overview',      to: '/dashboard/employee',         icon: <Icons.Grid />,   end: true },
     { label: 'My Tickets',    to: '/dashboard/employee/tickets', icon: <Icons.Ticket /> },
-    { label: 'Create Ticket', to: '/dashboard/employee/create',  icon: <Icons.Plus /> },
   ],
   SUPPORT_STAFF: [
     { label: 'Overview',      to: '/dashboard/support',          icon: <Icons.Grid />,   end: true },
     { label: 'My Queue',      to: '/dashboard/support/queue',    icon: <Icons.Clock /> },
-    { label: 'Create Ticket', to: '/dashboard/employee/create',  icon: <Icons.Plus /> },
   ],
   MANAGER: [
-    { label: 'Overview',      to: '/dashboard/manager',          icon: <Icons.Grid />,   end: true },
-    { label: 'Tickets',       to: '/dashboard/manager/tickets',  icon: <Icons.Ticket /> },
-    { label: 'Assign',        to: '/dashboard/manager/assign',   icon: <Icons.Assign /> },
-    { label: 'Reports',       to: '/dashboard/manager/reports',  icon: <Icons.Chart /> },
-    { label: 'Create Ticket', to: '/dashboard/employee/create',  icon: <Icons.Plus /> },
+    { label: 'Overview',      to: '/dashboard/manager',              icon: <Icons.Grid />,      end: true },
+    { label: 'Tickets',       to: '/dashboard/manager/tickets',      icon: <Icons.Ticket /> },
+    { label: 'My Tickets',    to: '/dashboard/manager/my-tickets',   icon: <Icons.MyTickets /> },
+    { label: 'Assign',        to: '/dashboard/manager/assign',       icon: <Icons.Assign /> },
+    { label: 'Reports',       to: '/dashboard/manager/reports',      icon: <Icons.Chart /> },
   ],
   ADMIN: [
-    { label: 'Overview',      to: '/dashboard/admin',              icon: <Icons.Grid />,     end: true },
+    { label: 'Overview',      to: '/dashboard/admin',              icon: <Icons.Grid />,      end: true },
     { label: 'All Tickets',   to: '/dashboard/admin/tickets',      icon: <Icons.Ticket /> },
+    { label: 'My Tickets',    to: '/dashboard/admin/my-tickets',   icon: <Icons.MyTickets /> },
     { label: 'Users',         to: '/dashboard/admin/users',        icon: <Icons.Users /> },
     { label: 'Reports',       to: '/dashboard/admin/reports',      icon: <Icons.Chart /> },
     { label: 'SLA Config',    to: '/dashboard/admin/sla',          icon: <Icons.Settings /> },
     { label: 'Re-categorize', to: '/dashboard/admin/recategorize', icon: <Icons.Folder /> },
-    { label: 'Create Ticket', to: '/dashboard/employee/create',    icon: <Icons.Plus /> },
+    { label: 'Categories',    to: '/dashboard/admin/categories',   icon: <Icons.Tag /> },
   ],
 };
 
@@ -105,7 +106,7 @@ const Sidebar = () => {
       </div>
 
       {/* ── User pill ── */}
-      {!collapsed && (
+      {/* {!collapsed && (
         <div className="mx-3 mt-4 mb-2 px-3 py-2.5 rounded-xl flex items-center gap-2.5"
           style={{ background: 'rgba(20,160,200,0.12)', border: '1px solid rgba(20,160,200,0.20)' }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 text-white"
@@ -119,7 +120,7 @@ const Sidebar = () => {
             </p>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* ── Nav links ── */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
@@ -174,14 +175,23 @@ const Sidebar = () => {
         style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         <button
           onClick={() => setCollapsed(p => !p)}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs transition-colors ${collapsed ? 'justify-center' : ''}`}
-          style={{ color: 'rgba(255,255,255,0.30)' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          className={`
+            w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200
+            text-white/70 hover:text-white 
+            hover:bg-white/10 active:bg-white/20
+            ${collapsed ? 'justify-center' : ''}
+          `}
         >
-          {collapsed ? <Icons.ChevronRight /> : <><Icons.ChevronLeft /><span>Collapse</span></>}
+          {collapsed ? (
+            <Icons.ChevronRight className="w-5 h-5" />
+          ) : (
+            <>
+              <Icons.ChevronLeft className="w-5 h-5" />
+              <span className="font-medium">Collapse</span>
+            </>
+          )}
         </button>
-        <button
+        {/* <button
           onClick={onLogout}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs transition-colors ${collapsed ? 'justify-center' : ''}`}
           style={{ color: 'rgba(255,255,255,0.30)' }}
@@ -190,7 +200,7 @@ const Sidebar = () => {
         >
           <Icons.Logout />
           {!collapsed && <span>Logout</span>}
-        </button>
+        </button> */}
       </div>
     </aside>
   );

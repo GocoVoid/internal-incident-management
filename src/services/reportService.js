@@ -48,7 +48,7 @@ export const getSLACompliance = () =>
  * Use the helper below to build the URL with auth token.
  */
 export const buildExportUrl = (params = {}) => {
-  const base   = import.meta.env.VITE_API_BASE_URL || 'http://192.168.0.205:6969/api';
-  const query  = new URLSearchParams({ format: 'csv', ...params }).toString();
-  return `${base}/reports/export?${query}`;
+  const base   = 'http://localhost:1111/api';
+  const query  = new URLSearchParams({ format: 'csv' }).toString();
+  return `${base}/reports/export`;
 };

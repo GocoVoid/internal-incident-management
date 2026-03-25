@@ -20,11 +20,11 @@ export const useTickets = (_currentUserId, _role) => {
     dbId:            t.id,
     title:           t.title,
     description:     t.description,
-    //category:        t.category?.categoryName ?? t.category ?? '',
+    category:        t.category?.categoryName ?? (typeof t.category === 'string' ? t.category : '') ?? '',
     categoryId:      t.category?.id           ?? t.categoryId ?? null,
     department:      t.category?.departmentName ?? t.category ?? null,
     priority:        t.priority,
-    status:          t.status.replace({"OPEN":"Open","CLOSED":"Closed","RESOLVED":"Resolved","IN_PROGRESS":"In Progress"}),
+    status:          ({"OPEN":"Open","CLOSED":"Closed","RESOLVED":"Resolved","IN_PROGRESS":"In Progress"})[t.status] ?? t.status,
     createdBy:       t.createdBy,
     createdByName:   t.createdByName  ?? t.createdBy?.name  ?? null,
     assignedTo:      t.assignedTo?.id ?? t.assignedTo       ?? null,
@@ -56,14 +56,10 @@ export const useTickets = (_currentUserId, _role) => {
     setLoading(true);
     setError(null);
     try {
-      console.log("Tickets Fetch Started");
       const ticketRes = await api.getIncidents();
-      console.log("Tickets Fetch Done");
       const list = (ticketRes?.content ?? ticketRes ?? []).map(normalise);
       setTickets(list);
-      console.log("Fetching Stats");
       const statsRes = await api.getIncidentStats();
-      console.log("Setting Stats");
       setStats({
         total:      statsRes.totalAll,
         open:       statsRes.open,
@@ -72,7 +68,6 @@ export const useTickets = (_currentUserId, _role) => {
         closed:     statsRes.closed,
         breached:   statsRes.slaBreached,
       });
-      console.log(stats);
     } catch (err) {
       setError(err?.message ?? 'Failed to load tickets.');
     } finally {
@@ -124,22 +119,25 @@ export const useTickets = (_currentUserId, _role) => {
     }));
   }, []);
 
-  const assignTicket = useCallback(async (incidentKey, assignedTo) => {
-    await api.assignIncident(incidentKey, assignedTo);
+  const assignTicket = useCallback(async (incidentKey, assignedToUserId, category) => {
+    await api.assignIncident(incidentKey, assignedToUserId, category);
     setTickets(prev => prev.map(t =>
       t.id === incidentKey
-        ? { ...t, assignedTo, status: 'In Progress', updatedAt: new Date().toISOString() }
+        ? { ...t, assignedTo: assignedToUserId, status: 'In Progress', updatedAt: new Date().toISOString() }
         : t
     ));
   }, []);
 
-  const addComment = useCallback(async (incidentKey, text, _authorName, isInternal = false) => {
-    const res = await api.addComment(incidentKey, text, isInternal);
+  const addComment = useCallback(async (incidentKey, text, _authorName, internal) => {
+    const res = await api.addComment(incidentKey, text, internal);
+    console.log(internal);
+    console.log(res);
+    console.log("Reached here");
     const newComment = {
       id:         res.id,
       author:     res.user?.name ?? _authorName ?? 'You',
       text:       res.commentText ?? text,
-      isInternal: res.isInternal ?? isInternal,
+      isInternal: res.internal ?? res.isInternal,
       createdAt:  res.createdAt,
     };
     setTickets(prev => prev.map(t =>

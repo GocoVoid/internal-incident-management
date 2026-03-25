@@ -80,8 +80,8 @@ export const unlockUser = (id) =>
  * @param {string} department - filter by department (optional)
  * Returns only SUPPORT_STAFF users with is_active=true
  */
-export const getSupportStaff = (department) =>
-  get('/users/support-staff', department ? { department } : {});
+export const getSupportStaff = () =>
+  get('/admin/support-staff');
 
 /* ══════════════════════════════════════════════════════════
    Current user profile

@@ -54,7 +54,7 @@ export const useSupportStaff = (department) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getSupportStaff(department)
+    getSupportStaff()
       .then(data => setStaff(data ?? []))
       .catch(() => setStaff([]))
       .finally(() => setLoading(false));
@@ -62,3 +62,4 @@ export const useSupportStaff = (department) => {
 
   return { staff, loading };
 };
+

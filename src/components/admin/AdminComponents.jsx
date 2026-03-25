@@ -5,17 +5,47 @@ import TicketDetailModal from '../shared/TicketDetailModal';
 import useTicketDetail from '../../hooks/useTicketDetail';
 import { useAuthContext } from '../../context/AuthContext';
 import { useAdminTickets } from '../../context/AdminTicketContext';
-
-
+import { CATEGORY_LIST } from '../../data/mockData';
 import { useReports } from '../../hooks/useReports';
 import { getSLAConfig, updateSLAConfig } from '../../services/slaService';
+
+/* ══════════════════════════════════════
+   Pagination (shared within this file)
+══════════════════════════════════════ */
+const Pagination = ({ page, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+  const set = new Set([0, page - 1, page, page + 1, totalPages - 1]);
+  const pages = [...set].filter(p => p >= 0 && p < totalPages).sort((a, b) => a - b);
+  const btnCls = 'min-w-[28px] h-7 px-2 rounded-lg text-xs font-medium transition-colors';
+  return (
+    <div className="flex items-center gap-1">
+      <button onClick={() => onPageChange(page - 1)} disabled={page === 0}
+        className={`${btnCls} disabled:opacity-30`}
+        style={{ background:'#fff', color:'#6b7280', border:'1px solid #d1d5db' }}>‹</button>
+      {pages.map((p, i) => (
+        <React.Fragment key={p}>
+          {i > 0 && p - pages[i - 1] > 1 && <span className="text-xs text-gray-400 px-1">…</span>}
+          <button onClick={() => onPageChange(p)} className={btnCls}
+            style={p === page
+              ? { background:'#3c3c8c', color:'#fff', border:'1px solid #3c3c8c' }
+              : { background:'#fff', color:'#6b7280', border:'1px solid #d1d5db' }}>
+            {p + 1}
+          </button>
+        </React.Fragment>
+      ))}
+      <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages - 1}
+        className={`${btnCls} disabled:opacity-30`}
+        style={{ background:'#fff', color:'#6b7280', border:'1px solid #d1d5db' }}>›</button>
+    </div>
+  );
+};
 
 /* ══════════════════════════════════════
    System KPI Cards
 ══════════════════════════════════════ */
 export const SystemKPICards = ({ stats }) => {
   const cards = [
-    { label: 'Total Tickets',    value: stats.total,      bg: 'bg-indigo-700', },
+    { label: 'Total Tickets',    value: stats.total,       bg: 'bg-indigo-700', },
     { label: 'Open',             value: stats.open,        bg: 'bg-cyan-600',   },
     { label: 'In Progress',      value: stats.inProgress,  bg: 'bg-amber-500',  },
     { label: 'Resolved',         value: stats.resolved,    bg: 'bg-green-600',  },
@@ -50,6 +80,8 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
   const [editUser,  setEditUser]  = useState(null);
   const [form,      setForm]      = useState(NEW_USER_INIT);
   const [errors,    setErrors]    = useState({});
+  const [userPage,  setUserPage]  = useState(0);
+  const USER_PAGE_SIZE = 10;
 
   const filtered = users.filter((u) => {
     const q = search.toLowerCase();
@@ -57,6 +89,13 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
     if (q && !u.name?.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
     return true;
   });
+
+  const userTotalPages  = Math.max(1, Math.ceil(filtered.length / USER_PAGE_SIZE));
+  const safeUserPage    = Math.min(userPage, userTotalPages - 1);
+  const pagedUsers      = filtered.slice(safeUserPage * USER_PAGE_SIZE, (safeUserPage + 1) * USER_PAGE_SIZE);
+
+  // Reset to page 0 when filters change
+  React.useEffect(() => { setUserPage(0); }, [search, roleFilter]);
 
   const openCreate = () => { setEditUser(null); setForm(NEW_USER_INIT); setErrors({}); setShowModal(true); };
   const openEdit   = (u)  => { setEditUser(u);  setForm({ name: u.name ?? u.fullName, email: u.email, role: u.role, department: u.department }); setErrors({}); setShowModal(true); };
@@ -116,7 +155,7 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((u) => (
+              {pagedUsers.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
@@ -145,10 +184,13 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button onClick={() => openEdit(u)}
-                        className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline">Edit</button>
-                      <span className="text-gray-300">|</span>
+                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-colors"
+                        style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
+                        Edit
+                      </button>
                       <button onClick={() => onToggleStatus(u.id, !u.active)}
-                        className={`text-xs hover:underline ${u.active ? 'text-red-500 hover:text-red-600' : 'text-green-600 hover:text-green-700'}`}>
+                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-colors"
+                        style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
                         {u.active ? 'Deactivate' : 'Reactivate'}
                       </button>
                     </div>
@@ -158,8 +200,9 @@ export const UserManagementTable = ({ users, onToggleStatus, onUpdateUser, onCre
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50">
+        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
           <p className="text-xs text-gray-400">{filtered.length} user{filtered.length !== 1 ? 's' : ''}</p>
+          <Pagination page={safeUserPage} totalPages={userTotalPages} onPageChange={setUserPage} />
         </div>
       </div>
 
@@ -229,7 +272,9 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
 
   const othersTickets = tickets.filter((t) => t.category === 'Others');
   const [selections, setSelections] = useState({});
-  const [done,       setDone]       = useState({});
+  const [applying,   setApplying]   = useState({});
+  const [successMsg, setSuccessMsg] = useState('');
+  const [dismissed,  setDismissed]  = useState({});  // tickets removed from UI immediately
 
   const handleChange = (id, val) => setSelections((p) => ({ ...p, [id]: val }));
 
@@ -237,23 +282,42 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
     const catId = selections[ticketId];
     if (!catId) return;
     const cat = CATEGORY_LIST.find(c => String(c.id) === String(catId));
-    await onRecategorize(ticketId, Number(catId));
-    setDone((p) => ({ ...p, [ticketId]: cat?.categoryName ?? catId }));
+    setApplying(p => ({ ...p, [ticketId]: true }));
+    try {
+      await onRecategorize(ticketId, Number(catId));
+      setSuccessMsg(`Ticket ${ticketId} re-categorized to ${cat?.categoryName ?? catId}. SLA clock started.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+      // Optimistically remove from UI immediately
+      setDismissed(p => ({ ...p, [ticketId]: true }));
+    } finally {
+      setApplying(p => ({ ...p, [ticketId]: false }));
+    }
   };
+
+  const visibleTickets = othersTickets.filter(t => !dismissed[t.id]);
 
   return (
     <>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
+        {successMsg && (
+          <div className="mb-4 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-green-50 border border-green-200 animate-fade-in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <p className="text-xs text-green-700">{successMsg}</p>
+          </div>
+        )}
         <div className="flex items-center gap-2 mb-4">
           <h3 className="text-sm font-semibold text-gray-900">Re-categorize "Others" Tickets</h3>
-          {othersTickets.length > 0 && (
+          {visibleTickets.length > 0 && (
             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-              {othersTickets.length} pending
+              {visibleTickets.length} pending
             </span>
           )}
         </div>
 
-        {othersTickets.length === 0 ? (
+        {visibleTickets.length === 0 ? (
           <div className="text-center py-8">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
               className="w-8 h-8 text-gray-300 mx-auto mb-2">
@@ -263,13 +327,11 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
           </div>
         ) : (
           <div className="space-y-3">
-            {othersTickets.map((t) => (
-              <div key={t.id} className={`p-4 rounded-xl border transition-colors
-                ${done[t.id] ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50/40'}`}>
+            {visibleTickets.map((t) => (
+              <div key={t.id} className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 transition-colors">
                 <div className="flex items-start gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      {/* Clickable ticket ID opens detail modal */}
                       <button
                         onClick={() => openTicket(t)}
                         className="font-mono text-xs font-medium hover:underline transition-colors"
@@ -287,34 +349,25 @@ export const RecategorizePanel = ({ tickets, onRecategorize }) => {
                       </button>
                     </div>
                     <p className="text-sm font-medium text-gray-800 mb-2">{t.title}</p>
-                    {done[t.id] ? (
-                      <div className="flex items-center gap-1.5 text-xs text-green-700">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                          className="w-3.5 h-3.5">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Re-categorized to <strong>{done[t.id]}</strong>. SLA clock started.
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <select value={selections[t.id] ?? ''}
-                          onChange={(e) => handleChange(t.id, e.target.value)}
-                          className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white">
-                          <option value="">Assign to department…</option>
-                          {CATEGORY_LIST.filter(c => c.categoryName !== 'Others').map(c => (
-                            <option key={c.id} value={c.id}>{c.categoryName}</option>
-                          ))}
-                        </select>
-                        <button onClick={() => handleApply(t.id)}
-                          disabled={!selections[t.id]}
-                          className="px-3 py-2 rounded-xl text-xs font-medium text-white bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 transition-colors whitespace-nowrap">
-                          Apply
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <select value={selections[t.id] ?? ''}
+                        onChange={(e) => handleChange(t.id, e.target.value)}
+                        className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white">
+                        <option value="">Assign to department…</option>
+                        {CATEGORY_LIST.filter(c => c.categoryName !== 'Others').map(c => (
+                          <option key={c.id} value={c.id}>{c.categoryName} — {c.departmentName}</option>
+                        ))}
+                      </select>
+                      <button onClick={() => handleApply(t.id)}
+                        disabled={!selections[t.id] || applying[t.id]}
+                        className="px-3 py-1.5 rounded-xl text-xs font-medium text-white disabled:opacity-50 transition-colors whitespace-nowrap"
+                        style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
+                        {applying[t.id] ? 'Applying…' : 'Apply'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
           ))}
         </div>
       )}
@@ -528,4 +581,3 @@ export const SystemReports = ({ tickets }) => {
     </div>
   );
 };
-

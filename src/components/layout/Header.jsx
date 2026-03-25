@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import CreateTicketModal from '../employee/CreateTicketModal';
 import { createIncident } from '../../services/incidentService';
+import { AdminTicketContext } from '../../context/AdminTicketContext';
 
 
 const BellIcon = () => (
@@ -115,6 +116,13 @@ const Header = ({ title }) => {
   const [showCreate,   setShowCreate]   = useState(false);
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
+  /* Use context createTicket for admin so dashboard refreshes; direct call for other roles */
+  const adminCtx  = React.useContext(AdminTicketContext);
+  const handleCreateTicket = async (data) => {
+    if (adminCtx?.createTicket) return adminCtx.createTicket(data);
+    return createIncident({ title: data.title, description: data.description, priority: data.priority, category: data.category });
+  };
+
   const badgeCount  = Math.min(unreadCount, 9);
   const badgeLabel  = unreadCount > 9 ? '9+' : String(badgeCount);
   const roleStyle   = ROLE_COLORS[user?.role] ?? ROLE_COLORS.EMPLOYEE;
@@ -141,7 +149,7 @@ const Header = ({ title }) => {
           {/* Role badge */}
           <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium"
             style={{ background:roleStyle.bg, color:roleStyle.text, border:`1px solid ${roleStyle.border}` }}>
-            {ROLE_LABELS[user?.role]}
+            {ROLE_LABELS[user?.role]}-{user?.department}
           </span>
 
           {/* New Ticket button — all roles */}
@@ -185,6 +193,7 @@ const Header = ({ title }) => {
                         <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white"
                           style={{ background:'#dc2626' }}>
                           {badgeLabel}
+                          {console.log(unreadCount)}
                         </span>
                       )}
                     </div>
@@ -225,7 +234,7 @@ const Header = ({ title }) => {
             </div>
             <div className="hidden md:block">
               <p className="text-xs font-semibold text-gray-900 leading-tight">{user?.fullName ?? user?.name}</p>
-              <p className="text-[10px] leading-tight" style={{ color:'#9ca3af' }}>{user?.department}</p>
+              {/* <p className="text-[10px] leading-tight" style={{ color:'#9ca3af' }}>{user?.role} - {user?.department}</p> */}
             </div>
           </div>
 
@@ -250,7 +259,7 @@ const Header = ({ title }) => {
       <CreateTicketModal
         isOpen={showCreate}
         onClose={() => setShowCreate(false)}
-        onSubmit={async (data) => createIncident({ title: data.title, description: data.description, priority: data.priority, category: data.category })}
+        onSubmit={handleCreateTicket}
       />
     </>
   );

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuthContext } from '../../context/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
-
 import { useNavigate } from 'react-router-dom';
 import { uploadAttachment } from '../../services/incidentService';
-import { CATEGORY_LIST, PRIORITIES } from '../../data/mockData';
+import { DEPARTMENTS_MAP, DEPARTMENT_NAMES, PRIORITIES } from '../../data/mockData';
+
+const INITIAL = { title: '', department: '', category: '', priority: '', description: '' };
 
 const Field = ({ label, error, children, hint }) => (
   <div>
@@ -17,37 +18,47 @@ const Field = ({ label, error, children, hint }) => (
 );
 
 const inputCls = (err) =>
-  `w-full px-3 py-2.5 text-sm rounded-xl border bg-white outline-none transition-all
-  ${err ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100'
+  `w-full px-3 py-2.5 text-sm rounded-xl border bg-white outline-none transition-all ${
+    err ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100'
         : 'border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'}`;
 
 const EmployeeCreateTicket = () => {
-  const { user }    = useAuthContext();
-  const navigate    = useNavigate();
+  const { user }         = useAuthContext();
+  const navigate         = useNavigate();
   const { createTicket } = useTickets(user?.id, 'EMPLOYEE');
 
-  const [form,    setForm]    = useState({ title: '', category: '', priority: '', description: '' });
-  const [errors,  setErrors]  = useState({});
-  const [files,   setFiles]   = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [form,     setForm]     = useState(INITIAL);
+  const [errors,   setErrors]   = useState({});
+  const [files,    setFiles]    = useState([]);
+  const [loading,  setLoading]  = useState(false);
   const [apiError, setApiError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success,  setSuccess]  = useState('');
 
-  const selectedCategory = CATEGORY_LIST.find(c => c.categoryName === form.category);
-  const isOthers = selectedCategory?.categoryName === 'Others';
+  /* Cascading sub-categories based on selected department */
+  const subCategories = form.department && form.department !== 'Others'
+    ? (DEPARTMENTS_MAP[form.department] ?? [])
+    : [];
 
   const validate = () => {
     const e = {};
-    if (!form.title.trim() || form.title.length < 3) e.title = 'Title must be at least 3 characters.';
-    if (form.title.length > 150)                     e.title = 'Title must be under 150 characters.';
-    if (!form.category)                            e.category = 'Please select a category.';
-    if (!form.priority)                              e.priority = 'Please select a priority.';
-    if (form.description.trim().length < 20)         e.description = 'Description must be at least 20 characters.';
+    if (!form.title.trim() || form.title.length < 3) e.title       = 'Title must be at least 3 characters.';
+    if (form.title.length > 150)                      e.title       = 'Title must be under 150 characters.';
+    if (!form.department)                             e.department  = 'Please select a department.';
+    if (!form.category)                               e.category    = 'Please select a category.';
+    if (!form.priority)                               e.priority    = 'Please select a priority.';
+    if (form.description.trim().length < 20)          e.description = 'Description must be at least 20 characters.';
     return e;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'department') {
+      /* Cascade: reset category when department changes */
+      setForm(p => ({ ...p, department: value, category: value === 'Others' ? 'Others' : '' }));
+      setErrors(p => ({ ...p, department: '', category: '' }));
+      setApiError('');
+      return;
+    }
     setForm(p => ({ ...p, [name]: value }));
     if (errors[name]) setErrors(p => ({ ...p, [name]: '' }));
     setApiError('');
@@ -57,7 +68,8 @@ const EmployeeCreateTicket = () => {
     const allowed = ['application/pdf','image/jpeg','image/png',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-    const valid = Array.from(e.target.files).filter(f => allowed.includes(f.type) && f.size <= 10*1024*1024);
+    const valid = Array.from(e.target.files)
+      .filter(f => allowed.includes(f.type) && f.size <= 10 * 1024 * 1024);
     setFiles(p => [...p, ...valid].slice(0, 5));
   };
 
@@ -76,9 +88,9 @@ const EmployeeCreateTicket = () => {
         category:    form.category,
       });
 
-      /* Upload attachments sequentially after ticket creation */
+      /* Upload attachments sequentially — non-fatal per file */
       for (const file of files) {
-        try { await uploadAttachment(ticket.id, file); } catch { /* non-fatal */ }
+        try { await uploadAttachment(ticket.id, file); } catch { /* skip */ }
       }
 
       setSuccess(ticket.id);
@@ -89,7 +101,11 @@ const EmployeeCreateTicket = () => {
     }
   };
 
+  /* ── Success screen ─────────────────────────────── */
   if (success) {
+    const ticketsRoute = user?.role === 'ADMIN'    ? '/dashboard/admin/tickets'
+                       : user?.role === 'MANAGER'  ? '/dashboard/manager/tickets'
+                       : '/dashboard/employee/tickets';
     return (
       <DashboardLayout title="Create Ticket">
         <div className="max-w-lg mx-auto mt-16 text-center animate-fade-in">
@@ -104,12 +120,12 @@ const EmployeeCreateTicket = () => {
           <p className="text-sm text-gray-500 mb-1">Your incident has been logged successfully.</p>
           <p className="font-mono text-sm font-bold mb-6" style={{ color: '#3c3c8c' }}>{success}</p>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={() => navigate('/dashboard/employee/tickets')}
+            <button onClick={() => navigate(ticketsRoute)}
               className="px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
               style={{ background: '#3c3c8c' }}>
-              View My Tickets
+              View Tickets
             </button>
-            <button onClick={() => { setSuccess(''); setForm({ title:'',category:'',priority:'',description:'' }); setFiles([]); }}
+            <button onClick={() => { setSuccess(''); setForm(INITIAL); setFiles([]); }}
               className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
               Create Another
             </button>
@@ -119,6 +135,7 @@ const EmployeeCreateTicket = () => {
     );
   }
 
+  /* ── Create form ────────────────────────────────── */
   return (
     <DashboardLayout title="Create Ticket">
       <div className="max-w-2xl animate-fade-in">
@@ -141,31 +158,49 @@ const EmployeeCreateTicket = () => {
         <form onSubmit={handleSubmit} noValidate
           className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-6 space-y-5">
 
+          {/* Title */}
           <Field label="Title *" error={errors.title} hint={`${form.title.length}/150 characters`}>
             <input name="title" value={form.title} onChange={handleChange}
               placeholder="Brief summary of the issue (3–150 characters)"
               className={inputCls(errors.title)} maxLength={150} />
           </Field>
 
+          {/* Department */}
+          <Field label="Department *" error={errors.department}>
+            <select name="department" value={form.department} onChange={handleChange}
+              className={inputCls(errors.department)}>
+              <option value="">Select department</option>
+              {DEPARTMENT_NAMES.map(d => <option key={d} value={d}>{d}</option>)}
+              <option value="Others">Others</option>
+            </select>
+          </Field>
+
+          {/* Category + Priority (cascaded) */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Category *" error={errors.category}>
               <select name="category" value={form.category} onChange={handleChange}
-                className={inputCls(errors.category)}>
-                <option value="">Select category</option>
-                {CATEGORY_LIST.map(c => (
-                  <option key={c.id} value={c.categoryName}>{c.categoryName}</option>
-                ))}
+                className={inputCls(errors.category)}
+                disabled={!form.department || form.department === 'Others'}>
+                <option value="">
+                  {!form.department ? 'Select department first'
+                    : form.department === 'Others' ? 'Others (auto-assigned)'
+                    : 'Select category'}
+                </option>
+                {subCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
+
             <Field label="Priority *" error={errors.priority}>
-              <select name="priority" value={form.priority} onChange={handleChange} className={inputCls(errors.priority)}>
+              <select name="priority" value={form.priority} onChange={handleChange}
+                className={inputCls(errors.priority)}>
                 <option value="">Select priority</option>
                 {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </Field>
           </div>
 
-          {isOthers && (
+          {/* Others notice */}
+          {form.department === 'Others' && (
             <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
               <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.8"
                 strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mt-0.5 shrink-0">
@@ -179,6 +214,7 @@ const EmployeeCreateTicket = () => {
             </div>
           )}
 
+          {/* Description */}
           <Field label="Description *" error={errors.description}
             hint={`${form.description.trim().length} characters (minimum 20)`}>
             <textarea name="description" value={form.description} onChange={handleChange}
@@ -191,8 +227,8 @@ const EmployeeCreateTicket = () => {
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
               Attachments <span className="text-gray-400 font-normal">(optional · PDF, JPG, PNG, DOCX, XLSX · max 10 MB · up to 5)</span>
             </label>
-            <label className={`flex items-center justify-center gap-2 w-full border-2 border-dashed rounded-xl py-5 cursor-pointer transition-colors
-              ${files.length >= 5 ? 'border-gray-200 bg-gray-50 cursor-not-allowed' : 'border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/30'}`}>
+            <label className={`flex items-center justify-center gap-2 w-full border-2 border-dashed rounded-xl py-5 cursor-pointer transition-colors ${
+              files.length >= 5 ? 'border-gray-200 bg-gray-50 cursor-not-allowed' : 'border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/30'}`}>
               <svg viewBox="0 0 24 24" fill="none" stroke="#6363b8" strokeWidth="1.8"
                 strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
@@ -221,6 +257,7 @@ const EmployeeCreateTicket = () => {
             )}
           </div>
 
+          {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
             <button type="button" onClick={() => navigate('/dashboard/employee')}
               className="px-4 py-2.5 rounded-xl text-sm text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">

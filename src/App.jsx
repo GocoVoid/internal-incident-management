@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
 import { AdminTicketProvider } from './context/AdminTicketContext';
+import { ManagerTicketProvider } from './context/ManagerTicketContext';
 
 /* ── Pages ───────────────────────────────────────────────────── */
 import LoginPage            from './pages/LoginPage';
@@ -13,10 +14,10 @@ import EmployeeCreateTicket from './pages/employee/EmployeeCreateTicket';
 import SupportOverview      from './pages/support/SupportOverview';
 import SupportQueue         from './pages/support/SupportQueue';
 
-import ManagerOverview      from './pages/manager/ManagerOverview';
-import { ManagerTickets, ManagerAssign, ManagerReports } from './pages/manager/ManagerPages';
 
-import { AdminOverview, AdminTickets, AdminUsers, AdminReports, AdminSLAConfig, AdminRecategorize }
+import { ManagerOverviewPage, ManagerTickets, ManagerAssign, ManagerReports, ManagerMyTickets } from './pages/manager/ManagerPages';
+
+import { AdminOverview, AdminTickets, AdminUsers, AdminReports, AdminSLAConfig, AdminRecategorize, AdminCategories, AdminMyTickets }
   from './pages/admin/AdminPages';
 
 /* ── Guards ──────────────────────────────────────────────────── */
@@ -56,6 +57,15 @@ const AdminRoute = ({ children }) => (
   </ProtectedRoute>
 );
 
+/* ── Manager wrapper — single ticket fetch for all manager routes ── */
+const ManagerRoute = ({ children }) => (
+  <ProtectedRoute allowedRoles={['MANAGER']}>
+    <ManagerTicketProvider>
+      {children}
+    </ManagerTicketProvider>
+  </ProtectedRoute>
+);
+
 /* ── App ─────────────────────────────────────────────────────── */
 const AppRoutes = () => (
   <Routes>
@@ -72,19 +82,22 @@ const AppRoutes = () => (
     <Route path="/dashboard/support"       element={P('SUPPORT_STAFF', <SupportOverview />)} />
     <Route path="/dashboard/support/queue" element={P('SUPPORT_STAFF', <SupportQueue />)} />
 
-    {/* Manager */}
-    <Route path="/dashboard/manager"         element={P('MANAGER', <ManagerOverview />)} />
-    <Route path="/dashboard/manager/tickets" element={P('MANAGER', <ManagerTickets />)} />
-    <Route path="/dashboard/manager/assign"  element={P('MANAGER', <ManagerAssign />)} />
-    <Route path="/dashboard/manager/reports" element={P('MANAGER', <ManagerReports />)} />
+    {/* Manager — all wrapped in ManagerTicketProvider */}
+    <Route path="/dashboard/manager"            element={<ManagerRoute><ManagerOverviewPage /></ManagerRoute>} />
+    <Route path="/dashboard/manager/tickets"    element={<ManagerRoute><ManagerTickets /></ManagerRoute>} />
+    <Route path="/dashboard/manager/my-tickets" element={<ManagerRoute><ManagerMyTickets /></ManagerRoute>} />
+    <Route path="/dashboard/manager/assign"     element={<ManagerRoute><ManagerAssign /></ManagerRoute>} />
+    <Route path="/dashboard/manager/reports"    element={<ManagerRoute><ManagerReports /></ManagerRoute>} />
 
     {/* Admin — all wrapped in AdminTicketProvider */}
     <Route path="/dashboard/admin"              element={<AdminRoute><AdminOverview /></AdminRoute>} />
     <Route path="/dashboard/admin/tickets"      element={<AdminRoute><AdminTickets /></AdminRoute>} />
+    <Route path="/dashboard/admin/my-tickets"   element={<AdminRoute><AdminMyTickets /></AdminRoute>} />
     <Route path="/dashboard/admin/users"        element={<AdminRoute><AdminUsers /></AdminRoute>} />
     <Route path="/dashboard/admin/reports"      element={<AdminRoute><AdminReports /></AdminRoute>} />
     <Route path="/dashboard/admin/sla"          element={<AdminRoute><AdminSLAConfig /></AdminRoute>} />
     <Route path="/dashboard/admin/recategorize" element={<AdminRoute><AdminRecategorize /></AdminRoute>} />
+    <Route path="/dashboard/admin/categories"    element={<AdminRoute><AdminCategories /></AdminRoute>} />
 
     <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes>

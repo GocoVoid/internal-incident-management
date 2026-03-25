@@ -1,81 +1,98 @@
-/**
- * AdminTicketContext.jsx
- *
- * Single fetch point for all admin ticket data.
- * All admin pages read from this context — no individual useTickets calls.
- * Fetches once on mount. Mutations update local state optimistically.
- */
-
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import * as api from '../services/incidentService';
+import { getSLAConfig } from '../services/slaService';
+import { getCategories, createCategory, updateCategory, deleteCategory } from '../services/categoryService';
 
-const AdminTicketContext = createContext(null);
+export const AdminTicketContext = createContext(null);
 
-const STATUS_MAP = {
-  OPEN: 'Open', CLOSED: 'Closed',
-  RESOLVED: 'Resolved', IN_PROGRESS: 'In Progress',
-};
+const STATUS_MAP = { OPEN:'Open', CLOSED:'Closed', RESOLVED:'Resolved', IN_PROGRESS:'In Progress' };
+const PAGE_SIZE  = 10;
 
 const normalise = (t) => ({
   id:             t.incidentKey,
   dbId:           t.id,
   title:          t.title,
   description:    t.description,
-  category:       t.category ?? '',
-  categoryId:     t.categoryId ?? null,
-  department:     t.department ?? null,
-  priority:       t.priority,
+  category:       t.category?.categoryName ?? (typeof t.category === 'string' ? t.category : '') ,
+  categoryId:     t.categoryId ?? t.category?.id ?? null,
+  department:     t.category?.departmentName ?? t.department ?? null,
+  priority:       t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1).toLowerCase() : '',
   status:         STATUS_MAP[t.status] ?? t.status,
   createdBy:      t.createdBy,
   createdByName:  t.createdByName ?? null,
   assignedTo:     t.assignedTo?.id ?? t.assignedTo ?? null,
-  assignedToName: t.assignedToName ?? t.assignedTo?.name ?? null,
+  assignedToName: t.assignedToName ?? null,
   slaDueAt:       t.slaDueAt,
-  isSlaBreached:  t.isSlaBreached ?? false,
+  isSlaBreached:  t.isSlaBreached ?? t.slaBreached ?? t.is_sla_breached ?? false,
   createdAt:      t.createdAt,
   updatedAt:      t.updatedAt,
   resolvedAt:     t.resolvedAt,
   closedAt:       t.closedAt,
   comments: (t.comments ?? []).map(c => ({
-    id:         c.id,
-    author:     c.user?.name ?? c.author ?? 'Unknown',
-    text:       c.commentText ?? c.text ?? '',
-    isInternal: c.isInternal ?? false,
-    createdAt:  c.createdAt,
+    id: c.id, author: c.user?.name ?? c.author ?? 'Unknown',
+    text: c.commentText ?? c.text ?? '', isInternal: c.isInternal ?? false, createdAt: c.createdAt,
   })),
   attachments: (t.attachments ?? []).map(a => ({
-    id:          a.id,
-    fileName:    a.fileName,
-    fileUrl:     a.fileUrl,
-    fileSize:    a.fileSize,
-    contentType: a.contentType,
+    id: a.id, fileName: a.fileName, fileUrl: a.fileUrl, fileSize: a.fileSize, contentType: a.contentType,
   })),
 });
 
 export const AdminTicketProvider = ({ children }) => {
-  const [tickets,  setTickets]  = useState([]);
-  const [stats,    setStats]    = useState({ total:0, open:0, inProgress:0, resolved:0, closed:0, breached:0 });
-  const [filters,  setFilters]  = useState({ status:'', priority:'', category:'', search:'' });
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
+  /* ── Master list (all tickets, fetched once) ── */
+  const [allTickets,  setAllTickets]  = useState([]);
+  const [stats,       setStats]       = useState({ total:0, open:0, inProgress:0, resolved:0, closed:0, breached:0 });
+  const [filters,     setFilters]     = useState({ status:'', priority:'', category:'', search:'' });
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
 
+  /* ── Prefetched SLA config ── */
+  const [slaConfig,   setSlaConfig]   = useState([]);
+  /* ── Categories (fetched with tickets) ── */
+  const [categories,  setCategories]  = useState([]);
+
+  /* ── Client-side pagination ── */
+  const [page,        setPage]        = useState(0);
+
+  /* ── Fetch ALL tickets once — no page/size params ── */
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const ticketRes = await api.getIncidents();
-      const list = (ticketRes?.content ?? ticketRes ?? []).map(normalise);
-      setTickets(list);
+      const [ticketRes, statsRes, slaRes, catRes] = await Promise.all([
+        api.getIncidents({ sort: 'createdAt,desc', size: 1000, page: 0 }),
+        api.getIncidentStats().catch(() => null),
+        getSLAConfig().catch(() => []),
+        getCategories().catch(() => []),
+      ]);
+      setSlaConfig(slaRes ?? []);
+      setCategories(catRes ?? []);
 
-      const s = await api.getIncidentStats();
-      setStats({
-        total:      s.totalAll,
-        open:       s.open,
-        inProgress: s.inProgress,
-        resolved:   s.resolved,
-        closed:     s.closed,
-        breached:   s.slaBreached,
-      });
+      const list = (ticketRes?.content ?? ticketRes ?? []).map(normalise);
+      /* Sort newest first in case backend doesn't honour the sort param */
+      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setAllTickets(list);
+      console.log(list);
+
+      if (statsRes) {
+        setStats({
+          total:      statsRes.totalAll      ?? statsRes.total            ?? list.length,
+          open:       statsRes.open          ?? statsRes.openCount        ?? 0,
+          inProgress: statsRes.inProgress    ?? statsRes.inProgressCount  ?? 0,
+          resolved:   statsRes.resolved      ?? statsRes.resolvedCount    ?? 0,
+          closed:     statsRes.closed        ?? statsRes.closedCount      ?? 0,
+          breached:   statsRes.slaBreached   ?? statsRes.breachedCount    ?? 0,
+        });
+      } else {
+        /* Derive from list as fallback */
+        setStats({
+          total:      list.length,
+          open:       list.filter(t => t.status === 'Open').length,
+          inProgress: list.filter(t => t.status === 'In Progress').length,
+          resolved:   list.filter(t => t.status === 'Resolved').length,
+          closed:     list.filter(t => t.status === 'Closed').length,
+          breached:   list.filter(t => t.isSlaBreached).length,
+        });
+      }
     } catch (err) {
       setError(err?.message ?? 'Failed to load tickets.');
     } finally {
@@ -85,77 +102,159 @@ export const AdminTicketProvider = ({ children }) => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  /* ── Filtered view ── */
-  const filteredTickets = useMemo(() => tickets.filter(t => {
-    if (filters.status   && t.status   !== filters.status)   return false;
-    if (filters.priority && t.priority !== filters.priority) return false;
-    if (filters.category && t.category !== filters.category) return false;
+  /* ── Client-side filter applied to full list ── */
+  const filteredTickets = useMemo(() => {
+    let list = allTickets;
+    if (filters.status)   list = list.filter(t => t.status   === filters.status);
+    if (filters.priority) list = list.filter(t => t.priority === filters.priority);
+    if (filters.category) list = list.filter(t => t.category === filters.category);
     if (filters.search) {
       const q = filters.search.toLowerCase();
-      if (!t.title.toLowerCase().includes(q) && !t.id.toLowerCase().includes(q)) return false;
+      list = list.filter(t =>
+        t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)
+      );
     }
-    return true;
-  }), [tickets, filters]);
+    return list;
+  }, [allTickets, filters]);
+
+  /* ── Client-side pagination derived from filteredTickets ── */
+  const totalItems  = filteredTickets.length;
+  const totalPages  = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const safePage    = Math.min(page, totalPages - 1);
+  const tickets     = filteredTickets.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  /* ── Filter helpers — instant, no fetch ── */
+  const updateFilter = useCallback((key, val) => {
+    setFilters(prev => ({ ...prev, [key]: val }));
+    setPage(0);
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters({ status:'', priority:'', category:'', search:'' });
+    setPage(0);
+  }, []);
+
+  /* ── Page navigation — instant ── */
+  const goToPage = useCallback((pageNum) => setPage(pageNum), []);
+
+  const refetch = fetchAll;
 
   /* ── Mutations ── */
   const createTicket = useCallback(async (data) => {
     const res = await api.createIncident({
-      title:       data.title,
-      description: data.description,
-      priority:    data.priority,
-      category:    data.category,
+      title: data.title, description: data.description,
+      priority: data.priority, category: data.category,
     });
     const t = normalise(res);
-    setTickets(p => [t, ...p]);
+    setAllTickets(p => [t, ...p]);
     setStats(p => ({ ...p, total: p.total + 1, open: p.open + 1 }));
+    setPage(0);
     return t;
   }, []);
 
   const updateStatus = useCallback(async (incidentKey, newStatus) => {
     await api.updateIncidentStatus(incidentKey, newStatus);
     const now = new Date().toISOString();
-    setTickets(p => p.map(t => t.id !== incidentKey ? t : {
+    setAllTickets(p => p.map(t => t.id !== incidentKey ? t : {
       ...t, status: newStatus, updatedAt: now,
       resolvedAt: newStatus === 'Resolved' ? now : t.resolvedAt,
       closedAt:   newStatus === 'Closed'   ? now : t.closedAt,
     }));
+    /* Refresh stats from server after status change */
+    api.getIncidentStats().then(s => s && setStats({
+      total:      s.totalAll    ?? s.total           ?? 0,
+      open:       s.open        ?? s.openCount        ?? 0,
+      inProgress: s.inProgress  ?? s.inProgressCount  ?? 0,
+      resolved:   s.resolved    ?? s.resolvedCount    ?? 0,
+      closed:     s.closed      ?? s.closedCount      ?? 0,
+      breached:   s.slaBreached ?? s.breachedCount    ?? 0,
+    })).catch(() => {});
   }, []);
 
-  const assignTicket = useCallback(async (incidentKey, assignedTo) => {
-    await api.assignIncident(incidentKey, assignedTo);
-    setTickets(p => p.map(t => t.id !== incidentKey ? t : {
-      ...t, assignedTo, status: 'In Progress', updatedAt: new Date().toISOString(),
+  const assignTicket = useCallback(async (incidentKey, assignedToUserId, category) => {
+    await api.assignIncident(incidentKey, assignedToUserId, category);
+    setAllTickets(p => p.map(t => t.id !== incidentKey ? t : {
+      ...t, assignedTo: assignedToUserId, status: 'In Progress', updatedAt: new Date().toISOString(),
     }));
   }, []);
 
   const addComment = useCallback(async (incidentKey, text, authorName, isInternal = false) => {
-    const res = await api.addComment(incidentKey, text, isInternal);
+    const res = api.addComment(incidentKey, text, isInternal);
+    console.log(res);
     const comment = {
-      id: res.id, author: res.user?.name ?? authorName ?? 'You',
-      text: res.commentText ?? text, isInternal: res.isInternal ?? isInternal,
+      id: res.id,
+      author: res.authorName ?? 'You',
+      text: res.commentText ?? text, isInternal: res.internal ?? isInternal,
       createdAt: res.createdAt,
     };
-    setTickets(p => p.map(t => t.id !== incidentKey ? t : {
+    setAllTickets(p => p.map(t => t.id !== incidentKey ? t : {
       ...t, comments: [...t.comments, comment], updatedAt: new Date().toISOString(),
     }));
   }, []);
 
   const recategorize = useCallback(async (incidentKey, categoryId) => {
     await api.recategorizeIncident(incidentKey, categoryId);
-    await fetchAll();
-  }, [fetchAll]);
+    /* Optimistically update the ticket with new category + department so
+       All Tickets / My Tickets reflect the change immediately */
+    const cat = categories.find(c => c.id === categoryId || c.id === Number(categoryId));
+    setAllTickets(p => p.map(t => {
+      if (t.id !== incidentKey) return t;
+      return {
+        ...t,
+        category:   cat?.categoryName   ?? t.category,
+        department: cat?.departmentName ?? t.department,
+        categoryId: categoryId,
+        updatedAt:  new Date().toISOString(),
+      };
+    }));
+    fetchAll(); // background sync to get slaDueAt and server-confirmed values
+  }, [fetchAll, categories]);
 
-  const updateFilter = useCallback((key, val) => setFilters(p => ({ ...p, [key]: val })), []);
-  const clearFilters = useCallback(() => setFilters({ status:'', priority:'', category:'', search:'' }), []);
-  const getTicketById = useCallback((id) => tickets.find(t => t.id === id) ?? null, [tickets]);
+  const updatePriority = useCallback(async (incidentKey, newPriority) => {
+    await api.updateIncidentPriority(incidentKey, newPriority);
+    setAllTickets(p => p.map(t => t.id !== incidentKey ? t : {
+      ...t, priority: newPriority, updatedAt: new Date().toISOString(),
+    }));
+  }, []);
+
+  /* ── Category / department management ── */
+  const addCategory = useCallback(async (data) => {
+    const res = await createCategory(data);
+    /* Normalise — API may return camelCase or different field names */
+    const cat = {
+      id:             res.id,
+      categoryName:   res.categoryName   ?? res.category_name   ?? data.categoryName,
+      departmentName: res.departmentName ?? res.department_name ?? data.departmentName,
+      ...res,
+    };
+    setCategories(p => [...p, cat]);
+    return cat;
+  }, []);
+
+  const editCategory = useCallback(async (id, data) => {
+    const res = await updateCategory(id, data);
+    setCategories(p => p.map(c => c.id === id ? { ...c, ...data, ...(res ?? {}) } : c));
+  }, []);
+
+  const removeCategory = useCallback(async (id) => {
+    await deleteCategory(id);
+    setCategories(p => p.filter(c => c.id !== id));
+  }, []);
+
+  const getTicketById = useCallback((id) => allTickets.find(t => t.id === id) ?? null, [allTickets]);
 
   return (
     <AdminTicketContext.Provider value={{
-      tickets: filteredTickets, allTickets: tickets,
+      /* Current page slice */
+      tickets,
+      /* Full list — used by Recategorize, Overview others count, etc. */
+      allTickets,
       stats, filters, loading, error,
-      refetch: fetchAll, updateFilter, clearFilters,
+      page: safePage, totalPages, totalItems, pageSize: PAGE_SIZE,
+      slaConfig, refetch, goToPage, updateFilter, clearFilters,
       createTicket, assignTicket, updateStatus,
-      addComment, recategorize, getTicketById,
+      addComment, recategorize, updatePriority, getTicketById,
+      categories, addCategory, editCategory, removeCategory,
     }}>
       {children}
     </AdminTicketContext.Provider>

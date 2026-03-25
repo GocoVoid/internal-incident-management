@@ -24,18 +24,19 @@ export const useNotifications = () => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const markRead = useCallback(async (id) => {
-    await markAsRead(id);
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, isRead: true } : n)
-    );
+  const markRead = useCallback((id) => {
+    // Optimistic — remove immediately, then fire API
+    setNotifications(prev => prev.filter(n => n.id !== id));
     setUnreadCount(prev => Math.max(0, prev - 1));
+    markAsRead(id).catch(() => {}); // fire-and-forget
   }, []);
 
-  const markAllRead = useCallback(async () => {
-    await markAllAsRead();
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  const markAllRead = useCallback(() => {
+    // Optimistic — clear inbox immediately, then fire API
+    console.log("In markAllRead");
+    setNotifications([]);
     setUnreadCount(0);
+    markAllAsRead().catch(() => {}); // fire-and-forget
   }, []);
 
   return { notifications, unreadCount, loading, markRead, markAllRead, refetch: fetchAll };

@@ -231,13 +231,55 @@ export const MOCK_REPORTS = {
 };
 
 /* ── Static category + priority + status constants ── */
+
+/**
+ * DEPARTMENTS_MAP defines the hierarchical structure:
+ * Department → [Sub-categories]
+ */
+export const DEPARTMENTS_MAP = {
+  IT: [
+    'Hardware Issues',
+    'Software Issues',
+    'Network Security & Connectivity',
+    'Server & Cloud',
+  ],
+  HR: [
+    'Payroll & Compensation',
+    'Leave & Attendance',
+    'Benefits & Perks',
+    'Onboarding/Offboarding',
+    'Employee Relations',
+  ],
+  Admin: [
+    'Workspace & Furniture',
+    'Facilities & Maintenance',
+    'Office Supplies',
+    'Meeting & Event Logistics',
+  ],
+  Facilities: [
+    'HVAC and Climate Control',
+    'Plumbing and Electrical',
+    'Janitorial and Sanitation',
+    'Structural Maintenance',
+  ],
+  Finance: [
+    'Travel & Expenses',
+    'Procurement & Vendors',
+    'Budgets & Approvals',
+    'Corporate Cards',
+    'Tax & Audits',
+  ],
+};
+
+export const DEPARTMENT_NAMES = Object.keys(DEPARTMENTS_MAP);
+
+/* Flat CATEGORY_LIST derived from DEPARTMENTS_MAP for backward-compat */
+let _catId = 1;
 export const CATEGORY_LIST = [
-  { id: 1, categoryName: 'IT',         departmentName: 'IT'         },
-  { id: 2, categoryName: 'HR',         departmentName: 'HR'         },
-  { id: 3, categoryName: 'Admin',      departmentName: 'Admin'      },
-  { id: 4, categoryName: 'Facilities', departmentName: 'Facilities' },
-  { id: 5, categoryName: 'Finance',    departmentName: 'Finance'    },
-  { id: 6, categoryName: 'Others',     departmentName: 'Others'     },
+  ...Object.entries(DEPARTMENTS_MAP).flatMap(([dept, subs]) =>
+    subs.map(sub => ({ id: _catId++, categoryName: sub, departmentName: dept }))
+  ),
+  { id: _catId++, categoryName: 'Others', departmentName: 'Others' },
 ];
 
 export const CATEGORY_NAMES = CATEGORY_LIST.map(c => c.categoryName);

@@ -12,6 +12,7 @@ import { getTicketVolume, getCategoryBreakdown, getReportSummary, buildExportUrl
 import { getUsers, toggleUserStatus, updateUser, createUser } from '../../services/userService';
 import { getSLAConfig, updateSLAConfig } from '../../services/slaService';
 import { useNavigate } from 'react-router-dom';
+import Modal from '../../components/shared/Modal';
 
 const STATUSES   = ['Open', 'In Progress', 'Resolved', 'Closed'];
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
@@ -40,20 +41,58 @@ const useChart = (ref, config, deps = []) => {
 /* ══════════════════════════════════════
    Admin Overview
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   Pagination
+══════════════════════════════════════ */
+const Pagination = ({ page, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+
+  const set = new Set([0, page - 1, page, page + 1, totalPages - 1]);
+  const pages = [...set].filter(p => p >= 0 && p < totalPages).sort((a, b) => a - b);
+
+  const btnCls = 'min-w-[28px] h-7 px-2 rounded-lg text-xs font-medium transition-colors';
+
+  return (
+    <div className="flex items-center gap-1">
+      <button onClick={() => onPageChange(page - 1)} disabled={page === 0}
+        className={`${btnCls} disabled:opacity-30`}
+        style={{ background:'#fff', color:'#6b7280', border:'1px solid #d1d5db' }}>‹</button>
+
+      {pages.map((p, i) => (
+        <React.Fragment key={p}>
+          {i > 0 && p - pages[i - 1] > 1 && (
+            <span className="text-xs text-gray-400 px-1">…</span>
+          )}
+          <button onClick={() => onPageChange(p)} className={btnCls}
+            style={p === page
+              ? { background:'#3c3c8c', color:'#fff', border:'1px solid #3c3c8c' }
+              : { background:'#fff', color:'#6b7280', border:'1px solid #d1d5db' }}>
+            {p + 1}
+          </button>
+        </React.Fragment>
+      ))}
+
+      <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages - 1}
+        className={`${btnCls} disabled:opacity-30`}
+        style={{ background:'#fff', color:'#6b7280', border:'1px solid #d1d5db' }}>›</button>
+    </div>
+  );
+};
+
 export const AdminOverview = () => {
   const { user }   = useAuthContext();
   const navigate   = useNavigate();
-  const { tickets, stats, loading, error, refetch, updateStatus, assignTicket, addComment, recategorize } =
+  const { allTickets, stats, loading, error, refetch, updateStatus, assignTicket, addComment, recategorize, updatePriority } =
     useAdminTickets();
   const { selected, openTicket, closeTicket } = useTicketDetail();
-  const othersCount = tickets.filter(t => t.category === 'Others').length;
+  const othersCount = allTickets.filter(t => t.category === 'Others').length;
 
   return (
     <DashboardLayout title="Overview">
       <div className="space-y-6 animate-fade-in">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">System Overview</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Full visibility across all departments.</p>
+          {/* <p className="text-sm text-gray-500 mt-0.5">Full visibility across all departments.</p> */}
         </div>
 
         {loading ? (
@@ -106,6 +145,7 @@ export const AdminOverview = () => {
         role={user?.role} user={user}
         onUpdateStatus={updateStatus} onAssign={assignTicket}
         onAddComment={addComment} onRecategorize={recategorize}
+        onUpdatePriority={updatePriority}
       />
     </DashboardLayout>
   );
@@ -117,7 +157,8 @@ export const AdminOverview = () => {
 export const AdminTickets = () => {
   const { user } = useAuthContext();
   const { tickets, filters, loading, error, refetch, updateFilter, clearFilters,
-          updateStatus, assignTicket, addComment, recategorize } = useAdminTickets();
+          updateStatus, assignTicket, addComment, recategorize, updatePriority,
+          page, totalPages, totalItems, goToPage } = useAdminTickets();
   const { selected, openTicket, closeTicket } = useTicketDetail();
 
   const formatDate = iso => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -164,36 +205,42 @@ export const AdminTickets = () => {
               <table className="w-full text-xs">
                 <thead>
                   <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
-                    {['Ticket ID','Title','Category','Priority','Status','Department','SLA','Created'].map(h => (
+                    {['Ticket ID','Title','Category','Priority','Status','Department','SLA','Created',''].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {tickets.map(t => (
-                    <tr key={t.id} onClick={() => openTicket(t)}
-                      className="hover:bg-indigo-50/20 transition-colors cursor-pointer group">
-                      <td className="px-4 py-3 font-mono font-medium group-hover:text-indigo-700 transition-colors" style={{ color: '#3c3c8c' }}>{t.id}</td>
-                      <td className="px-4 py-3 max-w-[180px]"><p className="truncate font-medium text-gray-800 group-hover:text-indigo-700 transition-colors">{t.title}</p></td>
+                    <tr key={t.id} className="hover:bg-indigo-50/20 transition-colors">
+                      <td className="px-4 py-3 font-mono font-medium" style={{ color: '#3c3c8c' }}>{t.id}</td>
+                      <td className="px-4 py-3 max-w-[180px]"><p className="truncate font-medium text-gray-800">{t.title}</p></td>
                       <td className="px-4 py-3 text-gray-600">{t.category}</td>
                       <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
                       <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                       <td className="px-4 py-3 text-gray-500">{t.department ?? '—'}</td>
                       <td className="px-4 py-3">
                         {t.isSlaBreached
-                          ? <span className="text-xs font-semibold text-red-600">Breached</span>
-                          : t.slaDueAt
-                            ? <span className="text-xs text-green-600">On track</span>
-                            : <span className="text-xs text-gray-400">No SLA</span>}
+                          ? <span className="text-xs font-semibold text-red-600">SLA Breached</span>
+                          : <span className="text-xs text-green-600">On track</span>}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{formatDate(t.createdAt)}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => openTicket(t)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-colors whitespace-nowrap"
+                          style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
+                          View
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="px-5 py-3 bg-gray-50" style={{ borderTop: '1px solid #f3f4f6' }}>
-              <p className="text-xs text-gray-400">{tickets.length} ticket{tickets.length !== 1 ? 's' : ''} found</p>
+            <div className="px-5 py-3 bg-gray-50 flex items-center justify-between" style={{ borderTop: '1px solid #f3f4f6' }}>
+              <p className="text-xs text-gray-400">{totalItems} ticket{totalItems !== 1 ? 's' : ''} total</p>
+              <Pagination page={page} totalPages={totalPages} onPageChange={goToPage} />
             </div>
           </div>
         )}
@@ -204,6 +251,7 @@ export const AdminTickets = () => {
         role={user?.role} user={user}
         onUpdateStatus={updateStatus} onAssign={assignTicket}
         onAddComment={addComment} onRecategorize={recategorize}
+        onUpdatePriority={updatePriority}
       />
     </DashboardLayout>
   );
@@ -271,21 +319,31 @@ export const AdminReports = () => {
   const lineRef  = useRef();
   const doughRef = useRef();
 
-  const [summary,  setSummary]  = useState(null);
-  const [volume,   setVolume]   = useState([]);
-  const [catBreak, setCatBreak] = useState([]);
-  const [rLoading, setRLoading] = useState(true);
-  const [rError,   setRError]   = useState(null);
+  const [summary,     setSummary]     = useState(null);
+  const [volume,      setVolume]      = useState([]);   // volume trend (respects period)
+  const [dailyVol,    setDailyVol]    = useState([]);   // daily breakdown (always 'day')
+  const [catBreak,    setCatBreak]    = useState([]);
+  const [rLoading,    setRLoading]    = useState(true);
+  const [rError,      setRError]      = useState(null);
+  const [exporting,   setExporting]   = useState(false);
+
+  /* Map UI label → API range param */
+  const PERIOD_MAP = { Daily: 'day', Weekly: 'week', Monthly: 'month' };
 
   const fetchReports = useCallback(async () => {
     setRLoading(true); setRError(null);
     try {
-      const [s, v, c] = await Promise.all([
+      const range = PERIOD_MAP[period] ?? 'week';
+      const [s, v, daily, c] = await Promise.all([
         getReportSummary(),
-        getTicketVolume({ range: period.toLowerCase() }),
+        getTicketVolume({ range }),
+        getTicketVolume({ range: 'day' }),   // always fetch daily for breakdown
         getCategoryBreakdown(),
       ]);
-      setSummary(s); setVolume(v ?? []); setCatBreak(c ?? []);
+      setSummary(s);
+      setVolume(v ?? []);
+      setDailyVol(daily ?? []);
+      setCatBreak(c ?? []);
     } catch (e) {
       setRError(e?.message ?? 'Failed to load reports.');
     } finally { setRLoading(false); }
@@ -293,17 +351,7 @@ export const AdminReports = () => {
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
 
-  useChart(barRef, {
-    type: 'bar',
-    data: { labels: volume.map(d => d.label), datasets: [{ label: 'Tickets', data: volume.map(d => d.count),
-      backgroundColor: volume.map((_, i) => i % 2 === 0 ? '#3c3c8c' : '#14a0c8'),
-      borderRadius: 6, borderSkipped: false, barThickness: 26 }] },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a1a4e', cornerRadius: 8, padding: 10 } },
-      scales: { x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-        y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { color: '#9ca3af', font: { size: 11 } }, border: { display: false } } } },
-  }, [chartjsLoaded, volume]);
-
+  /* Volume Trend — line chart (period-sensitive) */
   useChart(lineRef, {
     type: 'line',
     data: { labels: volume.map(d => d.label), datasets: [{ label: 'Volume', data: volume.map(d => d.count),
@@ -316,6 +364,18 @@ export const AdminReports = () => {
         y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { color: '#9ca3af', font: { size: 11 } }, border: { display: false } } } },
   }, [chartjsLoaded, volume]);
 
+  /* Daily Breakdown — bar chart (always day granularity) */
+  useChart(barRef, {
+    type: 'bar',
+    data: { labels: dailyVol.map(d => d.label), datasets: [{ label: 'Tickets', data: dailyVol.map(d => d.count),
+      backgroundColor: dailyVol.map((_, i) => i % 2 === 0 ? '#3c3c8c' : '#14a0c8'),
+      borderRadius: 6, borderSkipped: false, barThickness: 26 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a1a4e', cornerRadius: 8, padding: 10 } },
+      scales: { x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { color: '#9ca3af', font: { size: 11 } }, border: { display: false } } } },
+  }, [chartjsLoaded, dailyVol]);
+
   useChart(doughRef, {
     type: 'doughnut',
     data: { labels: catBreak.map(d => d.label), datasets: [{ data: catBreak.map(d => d.count),
@@ -325,11 +385,76 @@ export const AdminReports = () => {
         tooltip: { backgroundColor: '#1a1a4e', cornerRadius: 8, padding: 10 } } },
   }, [chartjsLoaded, catBreak]);
 
+  // const handleExport = async () => {
+  //   setExporting(true);
+  //   try {
+  //     const base  = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:1111/api';
+  //     const token = localStorage.getItem('iimp_refresh_token') ?? sessionStorage.getItem('iimp_refresh_token') ?? '';
+  //     console.log(token);
+  //     const url   = `${base}/reports/export?format=csv`;
+  //     const res   = buildExportUrl(url, {
+  //       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  //     });
+  //     if (!res.ok) throw new Error(`Export failed (${res.status})`);
+  //     const blob = await res.blob();
+  //     const link = document.createElement('a');
+  //     link.href     = URL.createObjectURL(blob);
+  //     link.download = `IIMP_Report_${period}_${new Date().toISOString().split('T')[0]}.csv`;
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     document.body.removeChild(link);
+  //     URL.revokeObjectURL(link.href);
+  //   } catch (err) {
+  //     alert(err?.message ?? 'Export failed. Please try again.');
+  //   } finally { setExporting(false); }
+  // };
+
   const handleExport = () => {
-    const url = buildExportUrl({ startDate: '', endDate: '' });
-    const a = document.createElement('a');
-    a.href = url; a.download = `IIMP_Report_${period}_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    setExporting(true);
+    try {
+      // 1. Define your data source (Replace 'reportData' with your actual state/variable)
+      // If your data isn't formatted yet, do it here.
+      const dataToExport = reportData || []; 
+  
+      if (dataToExport.length === 0) {
+        throw new Error("No data available to export.");
+      }
+  
+      // 2. Generate CSV Content
+      // Get headers from the keys of the first object
+      const headers = Object.keys(dataToExport[0]).join(",");
+      
+      // Map rows and handle potential commas in data by wrapping in quotes
+      const rows = dataToExport.map(row => 
+        Object.values(row)
+          .map(value => `"${String(value).replace(/"/g, '""')}"`) // Escape quotes and wrap in quotes
+          .join(",")
+      );
+  
+      const csvContent = [headers, ...rows].join("\n");
+  
+      // 3. Create a Blob from the CSV string
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      // 4. Trigger Download (Same logic as before)
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `IIMP_Report_${period}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  
+    } catch (err) {
+      console.error(err);
+      alert(err?.message ?? 'Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -338,10 +463,10 @@ export const AdminReports = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">System Reports</h2>
-            <p className="text-sm text-gray-500 mt-0.5">System-wide analytics and SLA performance.</p>
+            {/* <p className="text-sm text-gray-500 mt-0.5">System-wide analytics and SLA performance.</p> */}
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex rounded-xl overflow-hidden border border-gray-200">
+            {/* <div className="flex rounded-xl overflow-hidden border border-gray-200">
               {['Daily','Weekly','Monthly'].map(p => (
                 <button key={p} onClick={() => setPeriod(p)}
                   className="px-4 py-2 text-xs font-medium transition-colors"
@@ -349,16 +474,16 @@ export const AdminReports = () => {
                   {p}
                 </button>
               ))}
-            </div>
-            <button onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors"
-              style={{ color: '#3c3c8c', borderColor: '#c5c5e8' }}>
+            </div> */}
+            <button onClick={handleExport} disabled={exporting}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors disabled:opacity-60"
+              style={{ color: '#3c3c8c', borderColor: '#c5c5e8', background: '#fff' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                 strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              Export CSV
+              {exporting ? 'Exporting…' : 'Export CSV'}
             </button>
           </div>
         </div>
@@ -387,7 +512,7 @@ export const AdminReports = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
                   <h3 className="text-sm font-semibold text-gray-900 mb-1">Volume Trend</h3>
-                  <p className="text-xs text-gray-400 mb-4">Ticket submissions over the {period.toLowerCase()}</p>
+                  <p className="text-xs text-gray-400 mb-4">Ticket submissions — {period} view</p>
                   <div style={{ height: 200 }}><canvas ref={lineRef} /></div>
                 </div>
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
@@ -395,11 +520,11 @@ export const AdminReports = () => {
                   <p className="text-xs text-gray-400 mb-4">Distribution across departments</p>
                   <div style={{ height: 200 }}><canvas ref={doughRef} /></div>
                 </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5 lg:col-span-2">
+                {/* <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5 lg:col-span-2">
                   <h3 className="text-sm font-semibold text-gray-900 mb-1">Daily Breakdown</h3>
-                  <p className="text-xs text-gray-400 mb-4">Ticket count per weekday</p>
+                  <p className="text-xs text-gray-400 mb-4">Ticket count per day (current period)</p>
                   <div style={{ height: 200 }}><canvas ref={barRef} /></div>
-                </div>
+                </div> */}
               </div>
             )}
           </>
@@ -413,18 +538,13 @@ export const AdminReports = () => {
    Admin SLA Config
 ══════════════════════════════════════ */
 export const AdminSLAConfig = () => {
-  const [config,  setConfig]  = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const { slaConfig: prefetched, loading: ctxLoading } = useAdminTickets();
+  const [config, setConfig] = useState([]);
 
-  const fetchConfig = useCallback(async () => {
-    setLoading(true); setError(null);
-    try { setConfig((await getSLAConfig()) ?? []); }
-    catch (e) { setError(e?.message ?? 'Failed to load SLA config.'); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchConfig(); }, [fetchConfig]);
+  /* Sync from prefetched context data once available */
+  React.useEffect(() => {
+    if (prefetched?.length) setConfig(prefetched);
+  }, [prefetched]);
 
   const handleUpdate = async (id, resolutionTimeHours) => {
     await updateSLAConfig(id, resolutionTimeHours);
@@ -439,7 +559,7 @@ export const AdminSLAConfig = () => {
           <p className="text-sm text-gray-500 mt-0.5">Set resolution time limits per priority level. Changes apply to new tickets only.</p>
         </div>
         <div className="max-w-md">
-          {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={fetchConfig} /> : (
+          {ctxLoading && !config.length ? <LoadingState /> : (
             <SLAConfigPanel config={config} onUpdate={handleUpdate} />
           )}
         </div>
@@ -452,8 +572,8 @@ export const AdminSLAConfig = () => {
    Admin Recategorize
 ══════════════════════════════════════ */
 export const AdminRecategorize = () => {
-  const { tickets, loading, error, refetch, recategorize } = useAdminTickets();
-  const othersTickets = tickets.filter(t => t.category === 'Others');
+  const { allTickets, loading, error, refetch, recategorize } = useAdminTickets();
+  const othersTickets = allTickets.filter(t => t.category === 'Others');
 
   return (
     <DashboardLayout title="Re-categorize Tickets">
@@ -471,6 +591,383 @@ export const AdminRecategorize = () => {
           )}
         </div>
       </div>
+    </DashboardLayout>
+  );
+};
+
+/* ══════════════════════════════════════
+   Admin Categories & Departments
+══════════════════════════════════════ */
+const CAT_INIT = { categoryName: '', departmentName: '' };
+
+export const AdminCategories = () => {
+  const { categories, loading, error, refetch, addCategory, editCategory, removeCategory } = useAdminTickets();
+  const [showModal,  setShowModal]  = useState(false);
+  const [editItem,   setEditItem]   = useState(null);
+  const [form,       setForm]       = useState(CAT_INIT);
+  const [formErr,    setFormErr]    = useState({});
+  const [saving,     setSaving]     = useState(false);
+  const [apiErr,     setApiErr]     = useState('');
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [deleting,   setDeleting]   = useState(false);
+  /* Department filter */
+  const [deptFilter, setDeptFilter] = useState('');
+
+  const departments = [...new Set(categories.map(c => c.departmentName).filter(Boolean))].sort();
+  const displayed   = deptFilter
+    ? categories.filter(c => c.departmentName === deptFilter)
+    : categories;
+
+  const selCls = 'px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white';
+
+  const inpCls = (f) => `w-full px-3 py-2 text-sm rounded-xl border outline-none transition-all
+    ${formErr[f] ? 'border-red-300 focus:ring-2 focus:ring-red-100' : 'border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'}`;
+
+  const openCreate = () => { setEditItem(null); setForm(CAT_INIT); setFormErr({}); setApiErr(''); setShowModal(true); };
+  const openEdit   = (cat) => { setEditItem(cat); setForm({ categoryName: cat.categoryName, departmentName: cat.departmentName }); setFormErr({}); setApiErr(''); setShowModal(true); };
+
+  const validate = () => {
+    const e = {};
+    if (!form.categoryName.trim())   e.categoryName   = 'Required';
+    if (!form.departmentName.trim()) e.departmentName = 'Required';
+    return e;
+  };
+
+  const handleSave = async () => {
+    const e = validate();
+    if (Object.keys(e).length) { setFormErr(e); return; }
+    setSaving(true); setApiErr('');
+    try {
+      if (editItem) await editCategory(editItem.id, form);
+      else          await addCategory(form);
+      setShowModal(false);
+    } catch (err) {
+      setApiErr(err?.message ?? 'Failed to save.');
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try { await removeCategory(confirmDel); setConfirmDel(null); }
+    finally { setDeleting(false); }
+  };
+
+  return (
+    <DashboardLayout title="Categories & Departments">
+      <div className="space-y-5 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Categories & Departments</h2>
+            {/* <p className="text-sm text-gray-500 mt-0.5">Manage ticket categories and their associated departments.</p> */}
+          </div>
+          <button onClick={openCreate}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-colors"
+            style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Category
+          </button>
+        </div>
+
+        {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={refetch} /> : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm overflow-hidden">
+            <div className="px-5 py-3 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid #f3f4f6' }}>
+              <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className={selCls}>
+                <option value="">All Departments</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              {deptFilter && (
+                <button onClick={() => setDeptFilter('')} className="text-xs font-medium" style={{ color:'#14a0c8' }}>
+                  Clear filter
+                </button>
+              )}
+              <span className="ml-auto text-xs text-gray-400">{displayed.length} of {categories.length} categor{categories.length !== 1 ? 'ies' : 'y'}</span>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
+                  {['Category', 'Department', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-5 py-3 text-gray-500 font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {displayed.length === 0 ? (
+                  <tr><td colSpan={3} className="px-5 py-10 text-center text-sm text-gray-400">
+                    {deptFilter ? `No categories in "${deptFilter}" department.` : 'No categories yet.'}
+                  </td></tr>
+                ) : displayed.map(cat => (
+                  <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3 font-medium text-gray-800">{cat.categoryName}</td>
+                    <td className="px-5 py-3 text-gray-600">{cat.departmentName}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => openEdit(cat)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-colors"
+                          style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>Edit</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Add / Edit */}
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)}
+        title={editItem ? 'Edit Category' : 'Add Category'} size="sm">
+        <div className="space-y-4">
+          {apiErr && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-xl">{apiErr}</p>}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Category Name *</label>
+            <input value={form.categoryName}
+              onChange={e => { setForm(p => ({ ...p, categoryName: e.target.value })); setFormErr(p => ({ ...p, categoryName: '' })); }}
+              placeholder="e.g. IT, HR, Facilities" className={inpCls('categoryName')} />
+            {formErr.categoryName && <p className="mt-1 text-xs text-red-600">{formErr.categoryName}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Department Name *</label>
+            <input value={form.departmentName}
+              onChange={e => { setForm(p => ({ ...p, departmentName: e.target.value })); setFormErr(p => ({ ...p, departmentName: '' })); }}
+              placeholder="e.g. IT, Human Resources" className={inpCls('departmentName')} />
+            {formErr.departmentName && <p className="mt-1 text-xs text-red-600">{formErr.departmentName}</p>}
+          </div>
+          <div className="flex gap-3 pt-2 border-t border-gray-100">
+            <button onClick={() => setShowModal(false)}
+              className="flex-1 py-2.5 rounded-xl text-sm text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60"
+              style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
+              {saving ? 'Saving…' : editItem ? 'Save Changes' : 'Add Category'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete confirm
+      <Modal isOpen={!!confirmDel} onClose={() => setConfirmDel(null)} title="Delete Category" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Deleting this category may affect existing tickets. Continue?</p>
+          <div className="flex gap-3 pt-2 border-t border-gray-100">
+            <button onClick={() => setConfirmDel(null)}
+              className="flex-1 py-2.5 rounded-xl text-sm text-gray-600 border border-gray-200 hover:bg-gray-50">Cancel</button>
+            <button onClick={handleDelete} disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-60"
+              style={{ background:'linear-gradient(135deg,#dc2626,#b91c1c)' }}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </Modal> */}
+    </DashboardLayout>
+  );
+};
+/* ══════════════════════════════════════
+   Admin My Tickets
+   — shows only tickets created by the
+     currently logged-in admin user
+══════════════════════════════════════ */
+export const AdminMyTickets = () => {
+  const { user } = useAuthContext();
+  const { allTickets, loading, error, refetch,
+          updateStatus, assignTicket, addComment, recategorize, updatePriority } = useAdminTickets();
+  const { selected, openTicket, closeTicket } = useTicketDetail();
+
+  const [search,   setSearch]   = useState('');
+  const [status,   setStatus]   = useState('');
+  const [priority, setPriority] = useState('');
+
+  const [myPage, setMyPage] = useState(0);
+  const MY_PAGE_SIZE = 10;
+
+  /* Reset page when filters change */
+  useEffect(() => { setMyPage(0); }, [search, status, priority]);
+
+  /* Filter to tickets created by this admin */
+  const allMyTickets = allTickets.filter(t => {
+    const createdByName  = t.createdByName;
+    const matchesOwner = createdByName === user?.fullName;
+    const matchesSt    = !status   || t.status   === status;
+    const matchesPr    = !priority || t.priority === priority;
+    const matchesSe    = !search   || t.title.toLowerCase().includes(search.toLowerCase())
+                                   || t.id.toLowerCase().includes(search.toLowerCase());
+    return matchesOwner && matchesSt && matchesPr && matchesSe;
+  });
+
+  const myTotalPages = Math.max(1, Math.ceil(allMyTickets.length / MY_PAGE_SIZE));
+  const safeMyPage   = Math.min(myPage, myTotalPages - 1);
+  const myTickets    = allMyTickets.slice(safeMyPage * MY_PAGE_SIZE, (safeMyPage + 1) * MY_PAGE_SIZE);
+
+  const formatDate = iso => new Date(iso).toLocaleDateString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
+
+  const selCls = 'px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white';
+
+  const myStats = {
+    total:      allMyTickets.length,
+    open:       allMyTickets.filter(t => t.status === 'Open').length,
+    inProgress: allMyTickets.filter(t => t.status === 'In Progress').length,
+    resolved:   allMyTickets.filter(t => t.status === 'Resolved').length,
+    closed:     allMyTickets.filter(t => t.status === 'Closed').length,
+  };
+
+  const statCards = [
+    { label: 'Total',       value: myStats.total,      color: 'from-indigo-600 to-indigo-700' },
+    { label: 'Open',        value: myStats.open,        color: 'from-cyan-500 to-cyan-600'     },
+    { label: 'In Progress', value: myStats.inProgress,  color: 'from-amber-500 to-amber-600'   },
+    { label: 'Resolved',    value: myStats.resolved,    color: 'from-green-500 to-green-600'   },
+    { label: 'Closed',    value: myStats.closed,    color: 'from-gray-500 to-gray-600'   },
+  ];
+
+  return (
+    <DashboardLayout title="My Tickets">
+      <div className="space-y-5 animate-fade-in">
+
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">My Tickets</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              All tickets you have personally created.
+            </p>
+          </div>
+          {/* <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(60,60,140,0.08)', color: '#3c3c8c', border: '1px solid rgba(60,60,140,0.15)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+            {user?.fullName}
+          </div> */}
+        </div>
+
+        {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={refetch} /> : (
+          <>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {statCards.map(c => (
+                <div key={c.label}
+                  className={`rounded-2xl p-4 text-white bg-gradient-to-br ${c.color} shadow-pratiti-md`}>
+                  <p className="text-2xl font-bold leading-none mb-1">{c.value}</p>
+                  <p className="text-xs text-white/80">{c.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Filters + Table */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm overflow-hidden">
+              <div className="px-5 py-4 flex flex-wrap items-center gap-3"
+                style={{ borderBottom: '1px solid #f3f4f6' }}>
+
+                <div className="relative flex-1 min-w-[160px]">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+                    strokeLinecap="round" strokeLinejoin="round"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="Search by ID or title…"
+                    className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none" />
+                </div>
+
+                <select value={status}   onChange={e => setStatus(e.target.value)}   className={selCls}>
+                  <option value="">All Status</option>
+                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select value={priority} onChange={e => setPriority(e.target.value)} className={selCls}>
+                  <option value="">All Priority</option>
+                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                {(search || status || priority) && (
+                  <button onClick={() => { setSearch(''); setStatus(''); setPriority(''); }}
+                    className="text-xs font-medium" style={{ color: '#14a0c8' }}>
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
+                      {['Ticket ID', 'Title', 'Category', 'Department', 'Priority', 'Status', 'Assigned To', 'Created', ''].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {allMyTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-12 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"
+                              strokeLinecap="round" strokeLinejoin="round"
+                              className="w-10 h-10 text-gray-200">
+                              <path d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/>
+                            </svg>
+                            <p className="text-sm text-gray-400">
+                              {search || status || priority
+                                ? 'No tickets match your filters.'
+                                : "You haven't created any tickets yet."}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : myTickets.map(t => (
+                      <tr key={t.id} className="hover:bg-indigo-50/20 transition-colors">
+                        <td className="px-4 py-3 font-mono font-medium" style={{ color: '#3c3c8c' }}>{t.id}</td>
+                        <td className="px-4 py-3 max-w-[180px]">
+                          <p className="truncate text-gray-800 font-medium">{t.title}</p>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{t.category}</td>
+                        <td className="px-4 py-3 text-gray-500">{t.department ?? '—'}</td>
+                        <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
+                        <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                        <td className="px-4 py-3 text-gray-500">
+                          {t.assignedToName ? t.assignedToName : (
+                            <span className="text-gray-300 italic">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500">{formatDate(t.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => openTicket(t)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-medium text-white whitespace-nowrap transition-colors"
+                            style={{ background: 'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-5 py-3 bg-gray-50 flex items-center justify-between" style={{ borderTop: '1px solid #f3f4f6' }}>
+                <p className="text-xs text-gray-400">
+                  {allMyTickets.length} ticket{allMyTickets.length !== 1 ? 's' : ''}
+                  {(search || status || priority) && ` (filtered)`}
+                </p>
+                <Pagination page={safeMyPage} totalPages={myTotalPages} onPageChange={setMyPage} />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      <TicketDetailModal
+        ticket={selected} isOpen={!!selected} onClose={closeTicket}
+        role={user?.role} user={user}
+        onUpdateStatus={updateStatus} onAssign={assignTicket}
+        onAddComment={addComment} onRecategorize={recategorize}
+        onUpdatePriority={updatePriority}
+      />
     </DashboardLayout>
   );
 };

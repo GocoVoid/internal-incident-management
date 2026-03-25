@@ -20,12 +20,13 @@ export const AuthProvider = ({ children }) => {
   /** Called right after a successful /auth/login response */
   const handleLoginSuccess = useCallback((response) => {
     const { accessToken, refreshToken } = response;
+    const src = response.user ?? response;   // support both { user:{...} } and flat shapes
     const user = {
-      id:         response.id         ?? null,
-      email:      response.email      ?? null,
-      fullName:   response.name       ?? null,
-      role:       response.role       ?? null,
-      department: response.department ?? null,
+      id:         src.id         ?? null,
+      email:      src.email      ?? null,
+      fullName:   src.name ?? src.fullName ?? null,
+      role:       src.role       ?? null,
+      department: src.department ?? null,
     };
     saveTokens({ accessToken, refreshToken });
     saveUser(user);

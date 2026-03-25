@@ -3,9 +3,9 @@ import { StatusBadge, PriorityBadge } from '../shared/TicketBadge';
 import TicketDetailModal from '../shared/TicketDetailModal';
 import useTicketDetail from '../../hooks/useTicketDetail';
 import { useAuthContext } from '../../context/AuthContext';
-import { useTickets } from '../../hooks/useTickets';
-import { useSupportStaff } from '../../hooks/useUsers';
-import { useReports } from '../../hooks/useReports';
+import { useManagerTickets } from '../../context/ManagerTicketContext';
+import { useEffect } from 'react';
+import { getManagerSupportStaff } from '../../services/managerService';
 
 /* ══════════════════════════════════════
    Dept KPI Cards
@@ -15,17 +15,19 @@ export const DeptKPICards = ({ stats }) => {
     { label: 'Total Tickets', value: stats.total,      color: 'from-indigo-600 to-indigo-700' },
     { label: 'Open',          value: stats.open,        color: 'from-cyan-500  to-cyan-600'   },
     { label: 'In Progress',   value: stats.inProgress,  color: 'from-amber-500 to-amber-600'  },
+    { label: 'Closed',        value: stats.closed,    color: 'from-gray-500   to-gray-600'    },
+    { label: 'Resolved',        value: stats.resolved,    color: 'from-green-500   to-green-600'    },
     { label: 'SLA Breached',  value: stats.breached,    color: 'from-red-500   to-red-600'    },
   ];
-  const icons = ['📋', '🔵', '🟡', '🔴'];
+  // const icons = ['📋', '🔵', '🟡', '🔴'];
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-3 lg:grid-cols-6 gap-4">
       {cards.map((c, i) => (
         <div key={c.label}
           className={`rounded-2xl p-5 text-white bg-gradient-to-br ${c.color} shadow-pratiti-md`}>
           <div className="flex items-start justify-between mb-3">
             <p className="text-3xl font-bold leading-none">{c.value}</p>
-            <span className="text-xl">{icons[i]}</span>
+            {/* <span className="text-xl">{icons[i]}</span> */}
           </div>
           <p className="text-sm text-white/80">{c.label}</p>
         </div>
@@ -39,7 +41,7 @@ export const DeptKPICards = ({ stats }) => {
 ══════════════════════════════════════ */
 export const SLAHeatmap = ({ tickets }) => {
   const { user } = useAuthContext();
-  const { updateStatus, assignTicket, addComment, recategorize } = useTickets(user?.id, 'MANAGER');
+  const { updateStatus, assignTicket, addComment, recategorize, updatePriority } = useManagerTickets();
   const { selected, openTicket, closeTicket } = useTicketDetail();
 
   const breached = tickets.filter(t => t.isSlaBreached);
@@ -91,6 +93,7 @@ export const SLAHeatmap = ({ tickets }) => {
         role={user?.role} user={user}
         onUpdateStatus={updateStatus} onAssign={assignTicket}
         onAddComment={addComment} onRecategorize={recategorize}
+        onUpdatePriority={updatePriority}
       />
     </>
   );
@@ -101,7 +104,15 @@ export const SLAHeatmap = ({ tickets }) => {
 ══════════════════════════════════════ */
 export const AssignTicketPanel = ({ tickets, onAssign }) => {
   const { user } = useAuthContext();
-  const { staff: supportStaff, loading: staffLoading } = useSupportStaff(user?.department);
+  const [supportStaff, setSupportStaff] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(true);
+
+  useEffect(() => {
+    getManagerSupportStaff()
+      .then(data => setSupportStaff(data ?? []))
+      .catch(() => setSupportStaff([]))
+      .finally(() => setStaffLoading(false));
+  }, [user?.department]);
   const [selectedTicket, setSelectedTicket] = useState('');
   const [selectedStaff,  setSelectedStaff]  = useState('');
   const [loading,        setLoading]        = useState(false);
@@ -113,7 +124,8 @@ export const AssignTicketPanel = ({ tickets, onAssign }) => {
     if (!selectedTicket || !selectedStaff) return;
     setLoading(true);
     try {
-      await onAssign(selectedTicket, Number(selectedStaff));
+      const ticketObj = openTickets.find(t => t.id === selectedTicket);
+      await onAssign(selectedTicket, Number(selectedStaff), ticketObj?.category ?? '');
       const staff = supportStaff.find(s => s.id === Number(selectedStaff));
       setSuccess(`Ticket assigned to ${staff?.name ?? staff?.fullName}`);
       setSelectedTicket('');
@@ -169,14 +181,17 @@ export const AssignTicketPanel = ({ tickets, onAssign }) => {
 
 /* ══════════════════════════════════════
    Reports Chart
+   — reads from ManagerTicketContext (no independent fetch)
 ══════════════════════════════════════ */
 export const ReportsChart = () => {
-  const [range, setRange] = useState('week');
-  const { ticketVolume, categoryBreakdown, slaCompliance, loading } = useReports(range);
+  const {
+    reportSummary, ticketVolume, catBreakdown,
+    reportPeriod, reportLoading, changeReportPeriod,
+  } = useManagerTickets();
 
-  const maxVal   = Math.max(...ticketVolume.map(d => d.count), 1);
-  const maxCat   = Math.max(...categoryBreakdown.map(d => d.count), 1);
-  const compliance = slaCompliance?.compliance ?? 0;
+  const maxVal     = Math.max(...ticketVolume.map(d => d.count), 1);
+  const maxCat     = Math.max(...catBreakdown.map(d => d.count), 1);
+  const compliance = reportSummary?.slaCompliance ?? 0;
 
   const CAT_COLORS = {
     IT: 'bg-indigo-500', HR: 'bg-purple-500', Admin: 'bg-cyan-500',
@@ -189,16 +204,18 @@ export const ReportsChart = () => {
         <h3 className="text-sm font-semibold text-gray-900">Reports</h3>
         <div className="flex rounded-xl overflow-hidden border border-gray-200">
           {[['week','Weekly'],['month','Monthly'],['year','Yearly']].map(([val, label]) => (
-            <button key={val} onClick={() => setRange(val)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors
-                ${range === val ? 'bg-indigo-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
+            <button key={val} onClick={() => changeReportPeriod(val)}
+              className="px-3 py-1.5 text-xs font-medium transition-colors"
+              style={reportPeriod === val
+                ? { background: '#3c3c8c', color: '#fff' }
+                : { background: '#fff', color: '#6b7280' }}>
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      {loading ? (
+      {reportLoading ? (
         <p className="text-xs text-gray-400 text-center py-4">Loading…</p>
       ) : (
         <>
@@ -230,7 +247,7 @@ export const ReportsChart = () => {
           <div>
             <p className="text-xs font-medium text-gray-600 mb-3">By category</p>
             <div className="space-y-2">
-              {categoryBreakdown.map(c => (
+              {catBreakdown.map(c => (
                 <div key={c.label} className="flex items-center gap-3">
                   <span className="text-xs text-gray-600 w-16 shrink-0">{c.label}</span>
                   <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">

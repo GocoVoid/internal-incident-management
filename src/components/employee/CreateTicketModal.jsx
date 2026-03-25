@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import Modal from '../shared/Modal';
-import { CATEGORY_LIST, PRIORITIES } from '../../data/mockData';
+import { DEPARTMENTS_MAP, DEPARTMENT_NAMES, PRIORITIES } from '../../data/mockData';
 
-
-const INITIAL = { title: '', category: '', priority: '', description: '' };
+const INITIAL = { title: '', department: '', category: '', priority: '', description: '' };
 
 const Field = ({ label, error, children }) => (
   <div>
@@ -14,77 +13,82 @@ const Field = ({ label, error, children }) => (
 );
 
 const inputCls = (err) =>
-  `w-full px-3 py-2.5 text-sm rounded-xl border bg-white outline-none transition-all
-  ${err
-    ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100'
-    : 'border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
+  `w-full px-3 py-2.5 text-sm rounded-xl border bg-white outline-none transition-all ${
+    err
+      ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100'
+      : 'border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100'
   }`;
 
+const PRIORITY_COLORS = {
+  Low: 'text-green-600', Medium: 'text-amber-600',
+  High: 'text-orange-600', Critical: 'text-red-600',
+};
+
 const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
-  
   const [form,    setForm]    = useState(INITIAL);
   const [errors,  setErrors]  = useState({});
   const [loading, setLoading] = useState(false);
   const [files,   setFiles]   = useState([]);
 
+  const subCategories = form.department && form.department !== 'Others'
+    ? (DEPARTMENTS_MAP[form.department] ?? [])
+    : [];
+
   const validate = () => {
     const e = {};
-    if (!form.title.trim() || form.title.length < 3)   e.title       = 'Title must be at least 3 characters.';
-    if (form.title.length > 150)                        e.title       = 'Title must be under 150 characters.';
-    if (!form.category)                                 e.category    = 'Please select a category.';
-    if (!form.priority)                                 e.priority    = 'Please select a priority.';
-    if (form.description.trim().length < 20)            e.description = 'Description must be at least 20 characters.';
+    if (!form.title.trim() || form.title.length < 3) e.title       = 'Title must be at least 3 characters.';
+    if (form.title.length > 150)                      e.title       = 'Title must be under 150 characters.';
+    if (!form.department)                             e.department  = 'Please select a department.';
+    if (!form.category)                               e.category    = 'Please select a category.';
+    if (!form.priority)                               e.priority    = 'Please select a priority.';
+    if (form.description.trim().length < 20)          e.description = 'Description must be at least 20 characters.';
     return e;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
-    if (errors[name]) setErrors((p) => ({ ...p, [name]: '' }));
+    if (name === 'department') {
+      setForm(p => ({ ...p, department: value, category: value === 'Others' ? 'Others' : '' }));
+      setErrors(p => ({ ...p, department: '', category: '' }));
+      return;
+    }
+    setForm(p => ({ ...p, [name]: value }));
+    if (errors[name]) setErrors(p => ({ ...p, [name]: '' }));
   };
 
   const handleFiles = (e) => {
-    const picked = Array.from(e.target.files);
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png',
+    const allowed = ['application/pdf','image/jpeg','image/png',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-    const maxSize = 10 * 1024 * 1024;
-    const valid = picked.filter((f) => allowed.includes(f.type) && f.size <= maxSize);
-    const total = [...files, ...valid].slice(0, 5);
-    setFiles(total);
+    const valid = Array.from(e.target.files)
+      .filter(f => allowed.includes(f.type) && f.size <= 10 * 1024 * 1024);
+    setFiles(p => [...p, ...valid].slice(0, 5));
   };
 
-  const removeFile = (idx) => setFiles((p) => p.filter((_, i) => i !== idx));
+  const removeFile = (idx) => setFiles(p => p.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 600)); // simulate API
-    onSubmit({ ...form, attachments: files });
-    setForm(INITIAL);
-    setFiles([]);
-    setErrors({});
-    setLoading(false);
-    onClose();
+    try {
+      await onSubmit({ ...form, attachments: files });
+      setForm(INITIAL); setFiles([]); setErrors({});
+      onClose();
+    } catch {
+      /* keep modal open on error so user can retry */
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleClose = () => {
-    setForm(INITIAL); setFiles([]); setErrors({});
-    onClose();
-  };
-
-  const PRIORITY_COLORS = {
-    Low: 'text-green-600', Medium: 'text-amber-600',
-    High: 'text-orange-600', Critical: 'text-red-600',
-  };
+  const handleClose = () => { setForm(INITIAL); setFiles([]); setErrors({}); onClose(); };
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="New Incident Ticket" size="lg">
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
-        {/* Title */}
+
         <Field label="Title *" error={errors.title}>
           <input name="title" value={form.title} onChange={handleChange}
             placeholder="Brief summary of the issue (3–150 characters)"
@@ -92,13 +96,26 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
           <p className="mt-1 text-[10px] text-gray-400 text-right">{form.title.length}/150</p>
         </Field>
 
-        {/* Category + Priority */}
+        <Field label="Department *" error={errors.department}>
+          <select name="department" value={form.department} onChange={handleChange}
+            className={inputCls(errors.department)}>
+            <option value="">Select department</option>
+            {DEPARTMENT_NAMES.map(d => <option key={d} value={d}>{d}</option>)}
+            <option value="Others">Others</option>
+          </select>
+        </Field>
+
         <div className="grid grid-cols-2 gap-4">
           <Field label="Category *" error={errors.category}>
             <select name="category" value={form.category} onChange={handleChange}
-              className={inputCls(errors.category)}>
-              <option value="">Select category</option>
-              {CATEGORY_LIST.map((c) => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
+              className={inputCls(errors.category)}
+              disabled={!form.department || form.department === 'Others'}>
+              <option value="">
+                {!form.department ? 'Select department first'
+                  : form.department === 'Others' ? 'Others (auto-assigned)'
+                  : 'Select category'}
+              </option>
+              {subCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
 
@@ -106,15 +123,14 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
             <select name="priority" value={form.priority} onChange={handleChange}
               className={inputCls(errors.priority)}>
               <option value="">Select priority</option>
-              {PRIORITIES.map((p) => (
+              {PRIORITIES.map(p => (
                 <option key={p} value={p} className={PRIORITY_COLORS[p]}>{p}</option>
               ))}
             </select>
           </Field>
         </div>
 
-        {/* Others notice */}
-        {form.category === 'Others' && (
+        {form.department === 'Others' && (
           <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
               strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-amber-600 mt-0.5 shrink-0">
@@ -122,13 +138,12 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <p className="text-xs text-amber-700 leading-relaxed">
-              Tickets with <strong>Others</strong> category will be routed to the Admin for
-              re-categorization before being assigned. SLA will start after re-categorization.
+              Tickets under <strong>Others</strong> are routed to Admin for re-categorization
+              before assignment. SLA starts after re-categorization.
             </p>
           </div>
         )}
 
-        {/* Description */}
         <Field label="Description *" error={errors.description}>
           <textarea name="description" value={form.description} onChange={handleChange}
             rows={4} placeholder="Describe the issue in detail (minimum 20 characters)"
@@ -136,13 +151,12 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
           <p className="mt-1 text-[10px] text-gray-400">{form.description.trim().length} / 20 min</p>
         </Field>
 
-        {/* Attachments */}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">
-            Attachments <span className="text-gray-400">(optional · PDF, JPG, PNG, DOCX, XLSX · max 10 MB each · up to 5 files)</span>
+            Attachments <span className="text-gray-400">(optional · PDF, JPG, PNG, DOCX, XLSX · max 10 MB · up to 5)</span>
           </label>
-          <label className={`flex items-center justify-center gap-2 w-full border-2 border-dashed rounded-xl py-4 cursor-pointer transition-colors
-            ${files.length >= 5 ? 'border-gray-200 bg-gray-50 cursor-not-allowed' : 'border-indigo-200 bg-indigo-50/40 hover:bg-indigo-50 hover:border-indigo-400'}`}>
+          <label className={`flex items-center justify-center gap-2 w-full border-2 border-dashed rounded-xl py-4 cursor-pointer transition-colors ${
+            files.length >= 5 ? 'border-gray-200 bg-gray-50 cursor-not-allowed' : 'border-indigo-200 bg-indigo-50/40 hover:bg-indigo-50 hover:border-indigo-400'}`}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
               strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-indigo-500">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
@@ -155,7 +169,6 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
             <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
               onChange={handleFiles} disabled={files.length >= 5} className="hidden" />
           </label>
-
           {files.length > 0 && (
             <ul className="mt-2 space-y-1.5">
               {files.map((f, i) => (
@@ -163,8 +176,7 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
                   <span className="text-xs text-gray-700 truncate">{f.name}</span>
                   <button type="button" onClick={() => removeFile(i)}
                     className="ml-2 text-gray-400 hover:text-red-500 transition-colors shrink-0">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                      className="w-3.5 h-3.5">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
                       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
                   </button>
@@ -174,7 +186,6 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
           )}
         </div>
 
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
           <button type="button" onClick={handleClose}
             className="px-4 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-100 transition-colors">

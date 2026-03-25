@@ -13,5 +13,9 @@ export const markAsRead = (id) =>
   patch(`/notifications/read/${id}`);
 
 /** PATCH /notifications/read-all */
-export const markAllAsRead = () =>
-  patch('/notifications/read-all');
+export const markAllAsRead = async () =>
+  {
+    console.log("In service layer");
+    await patch('/notifications/read-all');
+    console.log("Fetched successfully");
+  }

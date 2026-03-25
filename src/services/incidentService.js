@@ -19,7 +19,7 @@
  *   status, priority, categoryId, search, page, size
  */
 
-import { get, post, patch, del } from './apiClient';
+import { get, post, patch, del, put } from './apiClient';
 
 /* ══════════════════════════════════════════════════════════
    Incidents
@@ -56,8 +56,8 @@ export const createIncident = (data) =>
   post('/incidents/createIncident', {
     title:       data.title,
     description: data.description,
-    priority:    data.priority?.toUpperCase(),
-    category:    data.category?.toUpperCase(),
+    priority:    data.priority.toUpperCase(),
+    category:    data.category,
   });
 
 /**
@@ -66,8 +66,23 @@ export const createIncident = (data) =>
  * Server updates: updatedAt, resolvedAt (if Resolved), closedAt (if Closed)
  * Roles: SUPPORT_STAFF (own tickets), MANAGER, ADMIN
  */
-export const updateIncidentStatus = (incidentKey, status) =>
-  patch(`/incidents/${incidentKey}/status`, { status });
+export const updateIncidentStatus = (incidentKey, newStatus) =>
+  {
+    if (newStatus=="In Progress") {
+      newStatus="IN_PROGRESS"
+    } else {
+      newStatus = newStatus.toUpperCase();
+    }
+    console.log(newStatus);
+    put(`/incidents/updateStatus/${incidentKey}`, { newStatus, note:null })
+  };
+
+  export const updateIncidentPriority = (incidentKey, priority) =>
+  {
+    priority = priority.toUpperCase();
+    console.log(incidentKey," ",priority);
+    patch(`/incidents/updatePriority/${incidentKey}`, { priority: priority.toUpperCase() })
+  };
 
 /**
  * PATCH /incidents/:incidentKey/assign
@@ -75,8 +90,8 @@ export const updateIncidentStatus = (incidentKey, status) =>
  * Server updates: status → "In Progress" if assigning, updatedAt, audit log
  * Roles: MANAGER, ADMIN
  */
-export const assignIncident = (incidentKey, assignedTo) =>
-  patch(`/incidents/${incidentKey}/assign`, { assignedTo });
+export const assignIncident = (incidentKey, assignedToUserId, category) =>
+  put(`/incidents/assign/${incidentKey}`, { assignedToUserId, category });
 
 /**
  * PATCH /incidents/:incidentKey/recategorize
@@ -85,7 +100,7 @@ export const assignIncident = (incidentKey, assignedTo) =>
  * Roles: MANAGER, ADMIN
  */
 export const recategorizeIncident = (incidentKey, categoryId) =>
-  patch(`/incidents/${incidentKey}/recategorize`, { categoryId });
+  put(`/incidents/${incidentKey}/recategorize`, { categoryId });
 
 /* ══════════════════════════════════════════════════════════
    Comments
@@ -98,8 +113,15 @@ export const recategorizeIncident = (incidentKey, categoryId) =>
  *   isInternal=false → visible to all including the employee who raised it
  * Server sets: userId (from JWT), createdAt
  */
-export const addComment = (incidentKey, commentText, isInternal = false) =>
-  post(`/incidents/${incidentKey}/comments`, { commentText, isInternal });
+
+export const getComments = (incidentKey) =>
+  get(`/incidents/getComments/${incidentKey}`);
+
+export const addComment = (incidentKey, commentText, internal = false) =>
+  {
+    console.log(internal);
+    post(`/incidents/addComments/${incidentKey}`, { commentText, internal });
+  }
 
 /* ══════════════════════════════════════════════════════════
    Attachments
@@ -133,7 +155,7 @@ export const deleteAttachment = (incidentKey, attachmentId) =>
  * Roles: MANAGER, ADMIN (employees cannot see audit trail)
  */
 export const getAuditLog = (incidentKey) =>
-  get(`/incidents/${incidentKey}/audit`);
+  get(`/incidents/audit/${incidentKey}`);
 
 /* ══════════════════════════════════════════════════════════
    Stats  (used by overview/dashboard pages)

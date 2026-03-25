@@ -3,7 +3,7 @@ import { StatusBadge, PriorityBadge } from './TicketBadge';
 import { useSupportStaff } from '../../hooks/useUsers';
 import { CATEGORY_LIST } from '../../data/mockData';
 
-import { getAuditLog } from '../../services/incidentService';
+import { getAuditLog, getComments, addComment } from '../../services/incidentService';
 
 /* ══════════════════════════════════════════════════════
    Helpers
@@ -25,8 +25,13 @@ const formatDate = (iso) => {
 
 /* Names are now resolved from ticket payload — createdByName / assignedToName
    set by the backend; fallback to IDs only if missing */
-const resolveName = (nameField, idField) =>
-  nameField ?? (idField ? `User #${idField}` : '—');
+const resolveName = (nameField, idField) => {
+  if (nameField) return nameField;
+  if (!idField) return '—';
+  // idField may be an object { id, name } from the API
+  if (typeof idField === 'object') return idField.name ?? idField.fullName ?? `User #${idField.id ?? '?'}`;
+  return `User #${idField}`;
+};
 
 const initials = (name) =>
   name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() ?? '??';
@@ -144,13 +149,48 @@ const STATUS_BTN_COLORS = {
   'In Progress': { bg: '#3c3c8c', hover: '#252568' },
 };
 
-const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize }) => {
+/* ══════════════════════════════════════════════════════
+   Priority Select — styled to match PriorityBadge
+══════════════════════════════════════════════════════ */
+const PRIORITY_CONFIG = {
+  Low:      { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0', dot: '#22c55e' },
+  Medium:   { bg: '#fffbeb', text: '#b45309', border: '#fde68a', dot: '#f59e0b' },
+  High:     { bg: '#fff7ed', text: '#c2410c', border: '#fed7aa', dot: '#f97316' },
+  Critical: { bg: '#fff1f2', text: '#b91c1c', border: '#fecaca', dot: '#ef4444' },
+};
+
+const PrioritySelect = ({ value, onChange }) => {
+  const cfg = PRIORITY_CONFIG[value] ?? { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb', dot: '#9ca3af' };
+  return (
+    <div className="relative inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 cursor-pointer"
+      style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}>
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cfg.dot }} />
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="text-xs font-medium appearance-none bg-transparent border-none outline-none focus:outline-none focus:ring-0 cursor-pointer pl-0.5 pr-4 py-0.5"
+        style={{ color: cfg.text }}>
+        {['Low', 'Medium', 'High', 'Critical'].map(p => (
+          <option key={p} value={p}>{p}</option>
+        ))}
+      </select>
+      {/* chevron */}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+        strokeLinecap="round" strokeLinejoin="round"
+        className="w-2.5 h-2.5 pointer-events-none absolute right-2"
+        style={{ color: cfg.text }}>
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+  );
+};
+
+const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize, onUpdatePriority }) => {
   const [comment,  setComment]  = useState('');
   const [isInternal, setIsInternal] = useState(false);
-  const [newCatId, setNewCatId] = useState('');
   const [assignTo, setAssignTo] = useState('');
-  const [loading,  setLoading]  = useState('');
-  const [success,  setSuccess]  = useState('');
+  const [loading,    setLoading]    = useState('');
+  const [success,    setSuccess]    = useState('');
 
   const { staff: supportStaff } = useSupportStaff(ticket.department);
   
@@ -174,9 +214,10 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
     if (!assignTo) return;
     setLoading('assign');
     try {
-      await onAssign(ticket.id, Number(assignTo));
       const staff = supportStaff.find(s => s.id === Number(assignTo));
-      flash(`Assigned to ${staff?.name ?? staff?.fullName ?? 'staff member'}`);
+      const staffName = staff?.name ?? staff?.fullName ?? null;
+      await onAssign(ticket.id, Number(assignTo), ticket.category, staffName);
+      flash(`Assigned to ${staffName ?? 'staff member'}`);
       setAssignTo('');
     } finally { setLoading(''); }
   };
@@ -187,20 +228,10 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
     setLoading('comment');
     try {
       await onAddComment(ticket.id, comment.trim(), user?.fullName, isInternal);
+      console.log(isInternal);
       setComment('');
       setIsInternal(false);
       flash('Comment posted.');
-    } finally { setLoading(''); }
-  };
-
-  const handleRecategorize = async () => {
-    if (!newCatId) return;
-    setLoading('recat');
-    try {
-      await onRecategorize(ticket.id, Number(newCatId));
-      const cat = CATEGORY_LIST.find(c => c.id === Number(newCatId));
-      flash(`Re-categorized to ${cat?.categoryName}. SLA clock started.`);
-      setNewCatId('');
     } finally { setLoading(''); }
   };
 
@@ -232,10 +263,8 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
               const col = STATUS_BTN_COLORS[s] ?? { bg: '#3c3c8c', hover: '#252568' };
               return (
                 <button key={s} onClick={() => handleStatus(s)} disabled={loading === 'status'}
-                  className="px-3 py-2 rounded-xl text-xs font-medium text-white transition-all disabled:opacity-60"
-                  style={{ background: col.bg }}
-                  onMouseEnter={e => e.currentTarget.style.background = col.hover}
-                  onMouseLeave={e => e.currentTarget.style.background = col.bg}>
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-all disabled:opacity-60"
+                  style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
                   {loading === 'status' ? 'Updating…' : `Mark as ${s}`}
                 </button>
               );
@@ -244,46 +273,28 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
         </div>
       )}
 
-      {/* Assign */}
-      {(role === 'MANAGER' || role === 'ADMIN') &&
+      {/* Assign — ADMIN only; Manager uses dedicated Assign page in sidebar */}
+      {role === 'ADMIN' &&
        (ticket.status === 'Open' || ticket.status === 'In Progress') && (
         <div>
           <p className="text-[10px] font-medium text-gray-500 mb-2 uppercase tracking-wide">Assign to support staff</p>
-          <div className="flex gap-2">
-            <select value={assignTo} onChange={e => setAssignTo(e.target.value)} className={selCls}>
+          <div className="space-y-2">
+            <select value={assignTo} onChange={e => setAssignTo(e.target.value)} className={selCls + ' w-full'}>
               <option value="">Select staff member…</option>
               {supportStaff.map(s => (
                 <option key={s.id} value={s.id}>{s.name ?? s.fullName} — {s.department}</option>
               ))}
             </select>
             <button onClick={handleAssign} disabled={!assignTo || loading === 'assign'}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-white disabled:opacity-50 shrink-0"
-              style={{ background: '#3c3c8c' }}>
+              className="w-full py-1.5 rounded-xl text-xs font-medium text-white disabled:opacity-50 transition-colors"
+              style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
               {loading === 'assign' ? 'Assigning…' : 'Assign'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Re-categorize (Admin only, Others tickets) */}
-      {role === 'ADMIN' && ticket.category === 'Others' && (
-        <div>
-          <p className="text-[10px] font-medium text-gray-500 mb-2 uppercase tracking-wide">Re-categorize</p>
-          <div className="flex gap-2">
-            <select value={newCatId} onChange={e => setNewCatId(e.target.value)} className={selCls}>
-              <option value="">Select category…</option>
-              {CATEGORY_LIST.filter(c => c.categoryName !== 'Others').map(c => (
-                <option key={c.id} value={c.id}>{c.categoryName}</option>
-              ))}
-            </select>
-            <button onClick={handleRecategorize} disabled={!newCatId || loading === 'recat'}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-white disabled:opacity-50 shrink-0"
-              style={{ background: '#d97706' }}>
-              {loading === 'recat' ? 'Applying…' : 'Apply'}
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Add comment */}
       <div>
@@ -299,8 +310,8 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
             </label>
           )}
           <button type="submit" disabled={!comment.trim() || loading === 'comment'}
-            className="w-full py-2 rounded-xl text-xs font-medium text-white disabled:opacity-50"
-            style={{ background: '#14a0c8' }}>
+            className="w-full py-1.5 rounded-xl text-xs font-medium text-white disabled:opacity-50 transition-colors"
+            style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
             {loading === 'comment' ? 'Posting…' : 'Post Comment'}
           </button>
         </form>
@@ -314,14 +325,45 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
 ══════════════════════════════════════════════════════ */
 const TicketDetailModal = ({
   ticket: initialTicket, isOpen, onClose,
-  role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize,
+  role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize, onUpdatePriority,
 }) => {
   const [ticket,    setTicket]    = useState(initialTicket);
   const [activeTab, setActiveTab] = useState('comments');
   const [auditLog,  setAuditLog]  = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
 
   useEffect(() => { setTicket(initialTicket); }, [initialTicket]);
+
+  /* Fetch comments from server when comments tab opened */
+  const fetchComments = useCallback(async () => {
+    if (!ticket?.id) return;
+    setCommentsLoading(true);
+    try {
+      const data = await getComments(ticket.id);
+      const normalised = (data ?? []).map(cm => ({
+        id:         cm.id,
+        author:     cm.user?.name ?? cm.user?.fullName ?? 'Unknown',
+        text:       cm.commentText ?? cm.text ?? '',
+        isInternal: cm.isInternal ?? false,
+        createdAt:  cm.createdAt,
+      }));
+      setTicket(p => ({ ...p, comments: normalised }));
+    } catch { /* keep existing */ }
+    finally { setCommentsLoading(false); }
+  }, [ticket?.id]);
+
+  /* Fetch comments once when modal opens / ticket changes */
+  useEffect(() => {
+    if (isOpen && ticket?.id) fetchComments();
+  }, [isOpen, ticket?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Re-fetch only when switching TO comments tab (not on every render) */
+  const prevTabRef = React.useRef(activeTab);
+  useEffect(() => {
+    if (activeTab === 'comments' && prevTabRef.current !== 'comments') fetchComments();
+    prevTabRef.current = activeTab;
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Fetch audit log when audit tab opened (MANAGER/ADMIN only) */
   const fetchAudit = useCallback(async () => {
@@ -360,21 +402,28 @@ const TicketDetailModal = ({
     }));
   };
 
-  const handleAssign = async (id, staffId) => {
-    await onAssign(id, staffId);
-    setTicket(p => ({ ...p, assignedTo: staffId, status: 'In Progress' }));
+  const handleAssign = async (id, staffId, category, staffName) => {
+    await onAssign(id, staffId, category, staffName);
+    setTicket(p => ({ ...p, assignedTo: staffId, assignedToName: staffName ?? p.assignedToName, status: 'In Progress' }));
+  };
+
+  const handleUpdatePriority = async (id, priority) => {
+    await onUpdatePriority?.(id, priority);
+    setTicket(p => ({ ...p, priority }));
   };
 
   const handleAddComment = async (id, text, author, isInternal) => {
     await onAddComment(id, text, author, isInternal);
     const c = { id: Date.now(), author, text, isInternal, createdAt: new Date().toISOString() };
     setTicket(p => ({ ...p, comments: [...(p.comments ?? []), c] }));
-    setActiveTab('comments');
+    // Do NOT change tab or re-fetch — optimistic update above is sufficient
   };
 
   const handleRecategorize = async (id, catId) => {
     await onRecategorize(id, catId);
-    /* After recategorize, useTickets.recategorize calls fetchAll so parent state refreshes */
+    /* onRecategorize calls fetchAll() in context — close modal so the
+       refreshed ticket list is immediately visible without manual reload */
+    onClose();
   };
 
   const createdByName  = resolveName(ticket.createdByName,  ticket.createdBy);
@@ -391,13 +440,13 @@ const TicketDetailModal = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ paddingTop: "72px" }}>
       <div className="absolute inset-0 animate-fade-in"
         style={{ background: 'rgba(26,26,78,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose} />
 
       <div className="relative w-full max-w-4xl bg-white rounded-2xl animate-slide-up flex flex-col"
-        style={{ maxHeight: '90vh', boxShadow: '0 32px 80px rgba(26,26,78,0.25), 0 8px 24px rgba(26,26,78,0.12)' }}>
+        style={{ maxHeight: 'calc(100vh - 88px)', boxShadow: '0 32px 80px rgba(26,26,78,0.25), 0 8px 24px rgba(26,26,78,0.12)' }}>
 
         {/* Header */}
         <div className="flex items-start gap-4 px-6 py-4 shrink-0"
@@ -424,17 +473,26 @@ const TicketDetailModal = ({
         <div className="flex-1 overflow-hidden flex">
 
           {/* Left: meta + actions */}
-          <div className="w-72 shrink-0 overflow-y-auto p-5 space-y-1"
+          <div className="w-1/3 shrink-0 overflow-y-auto p-5 space-y-1"
             style={{ borderRight: '1px solid #f3f4f6' }}>
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Details</p>
             <MetaRow label="Category">{ticket.category}</MetaRow>
             <MetaRow label="Department">{ticket.department ?? '—'}</MetaRow>
-            <MetaRow label="Priority"><PriorityBadge priority={ticket.priority} /></MetaRow>
+            <MetaRow label="Priority">
+              {(role === 'MANAGER' || role === 'ADMIN') ? (
+                <PrioritySelect
+                  value={ticket.priority}
+                  onChange={val => handleUpdatePriority(ticket.id, val)}
+                />
+              ) : (
+                <PriorityBadge priority={ticket.priority} />
+              )}
+            </MetaRow>
             <MetaRow label="Status"><StatusBadge status={ticket.status} /></MetaRow>
             <MetaRow label="Created by">{createdByName}</MetaRow>
-            <MetaRow label="Assigned to">
+            {/* <MetaRow label="Assigned to">
               {assignedToName ?? <span className="text-gray-400 font-normal">Unassigned</span>}
-            </MetaRow>
+            </MetaRow> */}
             <MetaRow label="Created">{formatDate(ticket.createdAt)}</MetaRow>
             <MetaRow label="Updated">{formatDate(ticket.updatedAt)}</MetaRow>
             {ticket.resolvedAt && <MetaRow label="Resolved">{formatDate(ticket.resolvedAt)}</MetaRow>}
@@ -477,6 +535,7 @@ const TicketDetailModal = ({
               onAssign={handleAssign}
               onAddComment={handleAddComment}
               onRecategorize={handleRecategorize}
+              onUpdatePriority={handleUpdatePriority}
             />
           </div>
 
@@ -509,7 +568,9 @@ const TicketDetailModal = ({
 
               {activeTab === 'comments' && (
                 <div className="animate-fade-in space-y-4">
-                  {!ticket.comments?.length ? (
+                  {commentsLoading ? (
+                    <p className="text-xs text-gray-400 text-center py-8">Loading comments…</p>
+                  ) : !ticket.comments?.length ? (
                     <div className="text-center py-12">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
                         strokeLinecap="round" strokeLinejoin="round"
