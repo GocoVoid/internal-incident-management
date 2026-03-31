@@ -205,7 +205,8 @@ const ResolutionNotePanel = ({ ticket, role, user, onSaveResolutionNote }) => {
     if (!note.trim()) return;
     setLoading(true);
     try {
-      await onSaveResolutionNote(ticket.id, note.trim());
+      await saveResolutionNote(ticket.id, note.trim());
+      setNote(note);
       setEditing(false);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -229,13 +230,13 @@ const ResolutionNotePanel = ({ ticket, role, user, onSaveResolutionNote }) => {
             <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
           </svg>
           <span className="text-xs font-semibold text-green-800 uppercase tracking-widest">Resolution Note</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
+          {/* <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
             Staff · Manager · Admin
-          </span>
+          </span> */}
         </div>
         {canEdit && !editing && (
           <button onClick={() => setEditing(true)}
-            className="text-[10px] px-2 py-0.5 rounded-lg text-green-700 hover:bg-green-100 transition-colors font-medium">
+            className="text-[12px] px-2 py-0.5 rounded-lg text-green-700 hover:bg-green-100 transition-colors font-medium">
             {note ? 'Edit' : '+ Add'}
           </button>
         )}
@@ -499,7 +500,7 @@ const TicketDetailModal = ({
 
   /* Handle save resolution note — optimistic update */
   const handleSaveResolutionNote = async (id, note) => {
-    await onSaveResolutionNote(id, note);
+    await saveResolutionNote(id, note);
     setResolutionNote(note);
     setTicket(p => ({ ...p, resolutionNote: note }));
   };
@@ -601,7 +602,7 @@ const TicketDetailModal = ({
         <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
 
           {/* Left: meta + actions */}
-          <div className="w-full sm:w-1/3 shrink-0 overflow-y-auto p-4 sm:p-5 space-y-1 border-b sm:border-b-0 sm:border-r border-gray-100">
+          <div className="w-full sm:w-2/5 shrink-0 overflow-y-auto p-4 sm:p-5 space-y-1 border-b sm:border-b-0 sm:border-r border-gray-100">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Details</p>
             <MetaRow label="Category">{ticket.category}</MetaRow>
             <MetaRow label="Department">{ticket.department ?? '—'}</MetaRow>
@@ -655,6 +656,18 @@ const TicketDetailModal = ({
                 </ul>
               )}
             </div>
+
+            {/* Resolution Note — SUPPORT_STAFF only, inline in left panel */}
+            {role === 'SUPPORT_STAFF' && (
+              <div className="pt-3">
+                <ResolutionNotePanel
+                  ticket={{ ...ticket, resolutionNote }}
+                  role={role}
+                  user={user}
+                  onSaveResolutionNote={handleSaveResolutionNote}
+                />
+              </div>
+            )}
 
             <ActionsPanel
               ticket={ticket} role={role} user={user}

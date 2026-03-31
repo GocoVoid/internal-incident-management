@@ -283,7 +283,7 @@ const Header = ({ title, onMenuClick }) => {
     <>
       <div className="fixed inset-0 z-30" onClick={() => setShowProfile(false)} />
       <div
-        className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-1rem)] bg-white rounded-2xl z-40 overflow-hidden animate-slide-up"
+        className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-[4.5rem] sm:top-full sm:mt-2 sm:w-72 bg-white rounded-2xl z-40 overflow-hidden animate-slide-up"
         style={{ boxShadow: '0 8px 32px rgba(60,60,140,0.16)', border: '1px solid #e5e7eb' }}
       >
         {/* Top gradient strip */}
@@ -298,7 +298,7 @@ const Header = ({ title, onMenuClick }) => {
             {initials}
           </div>
           <div className="min-w-0">
-            <p className="text-m font-semibold text-gray-900 leading-tight truncate">
+            <p className="text-sm font-semibold text-gray-900 leading-tight truncate">
               {user?.fullName ?? user?.name}
             </p>
             <p className="text-[12px] text-gray-400 truncate mt-0.5">{user?.email}</p>
@@ -306,29 +306,44 @@ const Header = ({ title, onMenuClick }) => {
         </div>
 
         {/* Detail rows */}
-        <div className="px-4 py-3 space-y-2.5">
+        <div className="px-4 py-3 space-y-2.5" style={{ borderBottom: '1px solid #f3f4f6' }}>
           {[
             { label: 'Role',       value: ROLE_LABELS[user?.role] ?? user?.role },
             { label: 'Department', value: user?.department ?? '—' },
-            { label: 'Email',      value: user?.email ?? '—' },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between gap-2 min-w-0">
               <span className="text-[12px] text-gray-400 shrink-0">{label}</span>
-              <span
-                className="text-[12px] font-medium text-gray-700 truncate text-right min-w-0"
-                title={value}
-              >
+              <span className="text-[12px] font-medium text-gray-700 truncate text-right min-w-0" title={value}>
                 {value}
               </span>
             </div>
           ))}
+        </div>
+
+        {/* Logout — always visible (especially useful on mobile) */}
+        <div className="px-4 py-3">
+          <button
+            onClick={() => { setShowProfile(false); onLogout(); }}
+            className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-medium transition-colors"
+            style={{ color:'#dc2626', border:'1px solid #fecaca', background:'#fef2f2' }}
+            onMouseEnter={e => e.currentTarget.style.background='#fee2e2'}
+            onMouseLeave={e => e.currentTarget.style.background='#fef2f2'}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign Out
+          </button>
         </div>
       </div>
     </>
   )}
 </div>
 
-          {/* Logout */}
+          {/* Logout — hidden on mobile (accessible via profile dropdown) */}
           <button onClick={onLogout}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ml-1"
             style={{ color:'#6b7280', border:'1px solid #e5e7eb' }}

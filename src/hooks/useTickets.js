@@ -4,7 +4,7 @@
  * Fetches from backend on mount; all mutations call the API then sync local state.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as api from '../services/incidentService';
 
 import * as support_api from '../services/supportService';
@@ -15,6 +15,38 @@ export const useTickets = (_currentUserId, _role) => {
   const [filters,  setFilters]  = useState({ status: '', priority: '', category: '', search: '' });
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
+  const [pollingEnabled, setPollingEnabled] = useState(false);
+  const currentFetchMode = useRef('all'); // track which fetch to use for polling
+
+  /* ── Silent background refresh ───────────────────────────── */
+  const silentRefreshAll = useCallback(async () => {
+    try {
+      const ticketRes = await api.getIncidents();
+      const list = (ticketRes?.content ?? ticketRes ?? []).map(normalise);
+      setTickets(list);
+    } catch (_) {}
+  }, []);
+
+  const silentRefreshByUser = useCallback(async () => {
+    try {
+      const ticketRes = await api.getIncidentsByUser();
+      const list = (ticketRes?.content ?? ticketRes ?? []).map(normalise);
+      setTickets(list);
+    } catch (_) {}
+  }, []);
+
+  /* ── Auto-poll every 30s ─────────────────────────────────── */
+  useEffect(() => {
+    if (!pollingEnabled) return;
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (currentFetchMode.current === 'user') silentRefreshByUser();
+      else silentRefreshAll();
+    };
+    const id = setInterval(tick, 30_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
+  }, [pollingEnabled, silentRefreshAll, silentRefreshByUser]);
 
   /* ── Normalise API ticket → UI shape ─────────────────────── */
   const normalise = (t) => ({
@@ -70,6 +102,8 @@ export const useTickets = (_currentUserId, _role) => {
         closed:     statsRes.closed ?? 0,
         breached:   statsRes.slaBreached ?? 0,
       });
+      currentFetchMode.current = 'all';
+      setPollingEnabled(true);
     } catch (err) {
       setError(err?.message ?? 'Failed to load tickets.');
     } finally {
@@ -96,8 +130,9 @@ export const useTickets = (_currentUserId, _role) => {
        inProgress: statsRes.inProgress ?? 0,
       resolved:   statsRes.resolved ?? 0,
       closed: statsRes.closed ?? 0,
-     
     });
+    currentFetchMode.current = 'user';
+    setPollingEnabled(true);
     } catch (err) {
       setError(err?.message ?? 'Failed to load tickets.');
     } finally {
@@ -122,7 +157,7 @@ export const useTickets = (_currentUserId, _role) => {
   ══════════════════════════════════════════════════════════ */
 
   const createTicket = useCallback(async (data) => {
-    const res = api.createIncident({
+    const res = await api.createIncident({
       title:       data.title,
       description: data.description,
       priority:    data.priority.toUpperCase(),
@@ -138,10 +173,12 @@ export const useTickets = (_currentUserId, _role) => {
       );
     }
 
+    // Optimistic update + background refresh
     setTickets(prev => [newTicket, ...prev]);
     setStats(prev => ({ ...prev, total: prev.total + 1, open: prev.open + 1 }));
+    fetchAll(); // sync with server
     return newTicket;
-  }, []);
+  }, [fetchAll]);
 
   const updateStatus = useCallback(async (incidentKey, newStatus) => {
     await api.updateIncidentStatus(incidentKey, newStatus);

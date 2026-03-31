@@ -49,6 +49,7 @@ export const useSupportTickets = () => {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
   const hasFetched = useRef(false);
+  const [pollingEnabled, setPollingEnabled] = useState(false);
 
   /* ── Initial load ────────────────────────────────────────── */
   const fetchAll = useCallback(async () => {
@@ -73,6 +74,7 @@ export const useSupportTickets = () => {
 console.log(statsRes.assignedInProgressCount);
 console.log(statsRes.assignedResolvedCount);
       hasFetched.current = true;
+      setPollingEnabled(true);
     } catch (err) {
       setError(err?.message ?? 'Failed to load queue.');
     } finally {
@@ -101,7 +103,7 @@ console.log(statsRes.assignedResolvedCount);
   }, []);
 
   /* ── Poll every 30s ──────────────────────────────────────── */
-  usePolling(silentRefresh, 30_000, hasFetched.current);
+  usePolling(silentRefresh, 30_000, pollingEnabled);
 
   return { tickets, stats, loading, error, fetchAll, silentRefresh };
 };
