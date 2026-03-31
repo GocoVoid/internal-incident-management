@@ -38,6 +38,9 @@ import { get, post, patch, del, put } from './apiClient';
 export const getIncidents = (params = {}) =>
   get('/incidents/getAllIncident', params);
 
+export const getIncidentsByUser = (params = {}) =>
+  get('/incidents/getIncidentByUser', params);
+
 /**
  * GET /incidents/:incidentKey
  * Returns full incident with nested: comments, attachments, auditLog
@@ -59,6 +62,9 @@ export const createIncident = (data) =>
     priority:    data.priority.toUpperCase(),
     category:    data.category,
   });
+
+export const uploadFiles = (id, formData) => 
+  post(`/incidents/${id}/uploadAttachments`, formData)
 
 /**
  * PATCH /incidents/:incidentKey/status
@@ -117,11 +123,8 @@ export const recategorizeIncident = (incidentKey, categoryId) =>
 export const getComments = (incidentKey) =>
   get(`/incidents/getComments/${incidentKey}`);
 
-export const addComment = (incidentKey, commentText, internal = false) =>
-  {
-    console.log(internal);
-    post(`/incidents/addComments/${incidentKey}`, { commentText, internal });
-  }
+export const addComment = (incidentKey, commentText, internal=false) =>
+  post(`/incidents/addComments/${incidentKey}`, { commentText, internal });
 
 /* ══════════════════════════════════════════════════════════
    Attachments
@@ -132,11 +135,11 @@ export const addComment = (incidentKey, commentText, internal = false) =>
  * Body: FormData with field `file` (one file per call)
  * Server stores: fileName, fileUrl, fileSize, contentType, uploadedBy (JWT), createdAt
  */
-export const uploadAttachment = (incidentKey, file) => {
-  const fd = new FormData();
-  fd.append('file', file);
-  return post(`/incidents/${incidentKey}/attachments`, fd);
-};
+// export const uploadAttachment = (incidentKey, file) => {
+//   const fd = new FormData();
+//   fd.append('file', file);
+//   return post(`/incidents/${incidentKey}/attachments`, fd);
+// };
 
 /**
  * DELETE /incidents/:incidentKey/attachments/:attachmentId
@@ -157,6 +160,30 @@ export const deleteAttachment = (incidentKey, attachmentId) =>
 export const getAuditLog = (incidentKey) =>
   get(`/incidents/audit/${incidentKey}`);
 
+
+/* ══════════════════════════════════════════════════════════
+   Resolution Note
+══════════════════════════════════════════════════════════ */
+ 
+/**
+ * GET /incidents/:incidentKey/resolution-note
+ * Returns: { resolutionNote: string | null }
+ * Roles: SUPPORT_STAFF (own assigned tickets), MANAGER, ADMIN
+ * Employees cannot see this note.
+ */
+export const getResolutionNote = (incidentKey) =>
+  get(`/notes/getResolutionNote/${incidentKey}`);
+ 
+/**
+ * PUT /incidents/:incidentKey/resolution-note
+ * Body: { resolutionNote: string }
+ * Creates or replaces the resolution note for the ticket.
+ * Roles: SUPPORT_STAFF (own assigned tickets), ADMIN
+ * Server sets: updatedBy (from JWT), updatedAt, adds audit entry (RESOLUTION_NOTE_ADDED / RESOLUTION_NOTE_UPDATED)
+ */
+export const saveResolutionNote = (incidentKey, note) =>
+  post(`/notes/addResolutionNote`, { incidentKey, note });  
+
 /* ══════════════════════════════════════════════════════════
    Stats  (used by overview/dashboard pages)
 ══════════════════════════════════════════════════════════ */
@@ -168,3 +195,9 @@ export const getAuditLog = (incidentKey) =>
  */
 export const getIncidentStats = () =>
   get('/incidents/stats');
+
+export const getIncidentStatsByUser=()=>
+  get('/incidents/userStats')
+
+export const getPriority = (data) => 
+  post('/predict', {description: data})

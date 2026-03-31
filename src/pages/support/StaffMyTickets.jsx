@@ -1,22 +1,38 @@
-// UPDATED WHOLE
-
 import React, { useState, useEffect } from 'react';
-import { StatusBadge, PriorityBadge } from '../shared/TicketBadge';
-import TicketDetailModal from '../shared/TicketDetailModal';
+import DashboardLayout from '../../components/layout/DashboardLayout';
+import TicketDetailModal from '../../components/shared/TicketDetailModal';
+import { StatusBadge, PriorityBadge } from '../../components/shared/TicketBadge';
 import { useAuthContext } from '../../context/AuthContext';
-import { PRIORITIES, STATUSES } from '../../data/mockData';
+import { useSupportTickets } from '../../hooks/useSupportTickets';
 import { useTickets } from '../../hooks/useTickets';
-import { LoadingState } from '../shared/PageState';
+import useTicketDetail from '../../hooks/useTicketDetail';
 
-const formatDate = (iso) => {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  });
-};
+/* ── Constants ───────────────────────────────────────────── */
+const STATUSES   = ['Open', 'In Progress', 'Resolved', 'Closed'];
+const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
 
-const PAGE_SIZE = 10;
+/* ── Loading / Error states ──────────────────────────────── */
+const LoadingState = () => (
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm
+    py-16 flex flex-col items-center gap-3">
+    <div className="w-6 h-6 rounded-full border-2 border-indigo-100 border-t-indigo-500 animate-spin"/>
+    <span className="text-xs text-gray-400">Loading tickets…</span>
+  </div>
+);
 
+const ErrorState = ({ message, onRetry }) => (
+  <div className="flex flex-col items-center gap-3 py-10">
+    <p className="text-sm text-red-500">{message}</p>
+    <button
+      onClick={onRetry}
+      className="text-xs font-medium text-indigo-600 hover:underline"
+    >
+      Retry
+    </button>
+  </div>
+);
+
+/* ── Pagination ─────────────────────────────────────────── */
 const Pagination = ({ page, totalPages, onPageChange }) => {
   if (totalPages <= 1) return null;
   const set = new Set([0, page - 1, page, page + 1, totalPages - 1]);
@@ -45,39 +61,60 @@ const Pagination = ({ page, totalPages, onPageChange }) => {
   );
 };
 
-const MyTicketsList = ({ onCreateClick }) => {
+const PAGE_SIZE = 10;
+
+/* ── Main Component ──────────────────────────────────────── */
+export const StaffMyTickets = () => {
   const { user } = useAuthContext();
 
-  const {
-    tickets: allTickets,
-    filters,
-    loading,
-    updateFilter,
-    clearFilters,
-    fetchAllByUser,
-    updateStatus,
-    assignTicket,
-    addComment,
-    recategorize,
-  } = useTickets(user?.id, 'EMPLOYEE');
+  /* tickets + loading/error state from support hook */
+  const { tickets: allTickets, loading, error, fetchAll } = useSupportTickets();
 
-  const [selected, setSelected] = useState(null);
-  const [page, setPage] = useState(0);
-  const hasActiveFilters = Object.values(filters).some(Boolean);
+  /* mutations */
+  const { updateStatus, addComment } = useTickets(user?.id, 'SUPPORT_STAFF');
 
-  useEffect(() => { fetchAllByUser(); }, []);
-  useEffect(() => { setPage(0); }, [filters]);
+  /* modal state */
+  const { selected, openTicket, closeTicket } = useTicketDetail();
 
-  const totalPages = Math.max(1, Math.ceil(allTickets.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const tickets = allTickets.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  /* fetch on mount */
+  useEffect(() => { fetchAll(); }, []);
+
+  /* filters */
+  const [search,   setSearch]   = useState('');
+  const [status,   setStatus]   = useState('');
+  const [priority, setPriority] = useState('');
+
+  const [page,     setPage]     = useState(0);
+
+  /* Filter to tickets created by this staff member */
+  const myTickets = allTickets.filter(t => {
+    const matchesOwner = t.createdByName === user?.fullName;
+    const matchesSt    = !status   || t.status   === status;
+    const matchesPr    = !priority || t.priority === priority;
+    const matchesSe    = !search
+                      || t.title.toLowerCase().includes(search.toLowerCase())
+                      || t.id.toLowerCase().includes(search.toLowerCase());
+    return matchesOwner && matchesSt && matchesPr && matchesSe;
+  });
+
+  useEffect(() => { setPage(0); }, [search, status, priority]);
+
+  const totalPages = Math.max(1, Math.ceil(myTickets.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages - 1);
+  const pagedTickets = myTickets.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  const formatDate = iso => new Date(iso).toLocaleDateString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
+
+  const selCls = 'px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white';
 
   const myStats = {
-    total:      allTickets.length,
-    open:       allTickets.filter(t => t.status === 'Open').length,
-    inProgress: allTickets.filter(t => t.status === 'In Progress').length,
-    resolved:   allTickets.filter(t => t.status === 'Resolved').length,
-    closed:     allTickets.filter(t => t.status === 'Closed').length,
+    total:      myTickets.length,
+    open:       myTickets.filter(t => t.status === 'Open').length,
+    inProgress: myTickets.filter(t => t.status === 'In Progress').length,
+    resolved:   myTickets.filter(t => t.status === 'Resolved').length,
+    closed:     myTickets.filter(t => t.status === 'Closed').length,
   };
 
   const statCards = [
@@ -88,20 +125,30 @@ const MyTicketsList = ({ onCreateClick }) => {
     { label: 'Closed',      value: myStats.closed,      color: 'from-gray-500 to-gray-600'     },
   ];
 
-  const selCls = 'px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white';
-
   return (
-    <>
+    <DashboardLayout title="My Tickets">
       <div className="space-y-5 animate-fade-in">
 
-        {/* <div className="flex items-center justify-between flex-wrap gap-3">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">My Tickets</h2>
-            <p className="text-sm text-gray-500 mt-0.5">All tickets you have personally created.</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              All tickets you have personally created.
+            </p>
           </div>
-        </div> */}
+          {/* <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+            style={{ background: 'rgba(60,60,140,0.08)', color: '#3c3c8c', border: '1px solid rgba(60,60,140,0.15)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+            {user?.fullName}
+          </div> */}
+        </div>
 
-        {loading ? <LoadingState /> : (
+        {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={fetchAll} /> : (
           <>
             {/* Stat Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -119,33 +166,43 @@ const MyTicketsList = ({ onCreateClick }) => {
               <div className="px-5 py-4 flex flex-wrap items-center gap-3"
                 style={{ borderBottom: '1px solid #f3f4f6' }}>
 
+                {/* Search */}
                 <div className="relative flex-1 min-w-[160px]">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
                     strokeLinecap="round" strokeLinejoin="round"
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none">
                     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                   </svg>
-                  <input value={filters.search} onChange={e => updateFilter('search', e.target.value)}
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
                     placeholder="Search by ID or title…"
-                    className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none" />
+                    className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none"
+                  />
                 </div>
 
-                <select value={filters.status}   onChange={e => updateFilter('status', e.target.value)}   className={selCls}>
+                <select value={status}   onChange={e => setStatus(e.target.value)}   className={selCls}>
                   <option value="">All Status</option>
                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <select value={filters.priority} onChange={e => updateFilter('priority', e.target.value)} className={selCls}>
+
+                <select value={priority} onChange={e => setPriority(e.target.value)} className={selCls}>
                   <option value="">All Priority</option>
                   {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
 
-                {hasActiveFilters && (
-                  <button onClick={clearFilters} className="text-xs font-medium" style={{ color: '#14a0c8' }}>
+                {(search || status || priority) && (
+                  <button
+                    onClick={() => { setSearch(''); setStatus(''); setPriority(''); }}
+                    className="text-xs font-medium"
+                    style={{ color: '#14a0c8' }}
+                  >
                     Clear
                   </button>
                 )}
               </div>
 
+              {/* Table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -156,21 +213,24 @@ const MyTicketsList = ({ onCreateClick }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {allTickets.length === 0 ? (
+                    {myTickets.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-12 text-center">
                           <div className="flex flex-col items-center gap-3">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"
-                              strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 text-gray-200">
+                              strokeLinecap="round" strokeLinejoin="round"
+                              className="w-10 h-10 text-gray-200">
                               <path d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/>
                             </svg>
                             <p className="text-sm text-gray-400">
-                              {hasActiveFilters ? 'No tickets match your filters.' : "You haven't created any tickets yet."}
+                              {search || status || priority
+                                ? 'No tickets match your filters.'
+                                : "You haven't created any tickets yet."}
                             </p>
                           </div>
                         </td>
                       </tr>
-                    ) : tickets.map(t => (
+                    ) : pagedTickets.map(t => (
                       <tr key={t.id} className="hover:bg-indigo-50/20 transition-colors">
                         <td className="px-4 py-3 font-mono font-medium" style={{ color: '#3c3c8c' }}>{t.id}</td>
                         <td className="px-4 py-3 max-w-[180px]">
@@ -178,17 +238,19 @@ const MyTicketsList = ({ onCreateClick }) => {
                         </td>
                         <td className="px-4 py-3 text-gray-600">{t.category}</td>
                         <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
-                        <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                        <td className="px-4 py-3"><StatusBadge   status={t.status}   /></td>
                         <td className="px-4 py-3 text-gray-500">
-                          {t.assignedToName ? t.assignedToName : (
+                          {t.assignedToName ?? (
                             <span className="text-gray-300 italic">Unassigned</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-500">{formatDate(t.createdAt)}</td>
                         <td className="px-4 py-3">
-                          <button onClick={() => setSelected(t)}
+                          <button
+                            onClick={() => openTicket(t)}
                             className="px-3 py-1.5 rounded-xl text-xs font-medium text-white whitespace-nowrap transition-colors"
-                            style={{ background: 'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
+                            style={{ background: 'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}
+                          >
                             View
                           </button>
                         </td>
@@ -198,31 +260,30 @@ const MyTicketsList = ({ onCreateClick }) => {
                 </table>
               </div>
 
-              <div className="px-5 py-3 bg-gray-50 flex items-center justify-between" style={{ borderTop: '1px solid #f3f4f6' }}>
+              {/* Footer count */}
+              <div className="px-5 py-3 bg-gray-50" style={{ borderTop: '1px solid #f3f4f6' }}>
                 <p className="text-xs text-gray-400">
-                  {allTickets.length} ticket{allTickets.length !== 1 ? 's' : ''}
-                  {hasActiveFilters && ' (filtered)'}
+                  {myTickets.length} ticket{myTickets.length !== 1 ? 's' : ''}
+                  {(search || status || priority) && ' (filtered)'}
                 </p>
-                <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
               </div>
             </div>
           </>
         )}
       </div>
 
+      {/* Staff gets view + comment only — no assign / recategorize / priority */}
       <TicketDetailModal
         ticket={selected}
         isOpen={!!selected}
-        onClose={() => setSelected(null)}
+        onClose={closeTicket}
         role={user?.role}
         user={user}
         onUpdateStatus={updateStatus}
-        onAssign={assignTicket}
         onAddComment={addComment}
-        onRecategorize={recategorize}
       />
-    </>
+    </DashboardLayout>
   );
 };
 
-export default MyTicketsList;
+export default StaffMyTickets;

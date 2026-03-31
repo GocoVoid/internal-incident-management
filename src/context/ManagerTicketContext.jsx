@@ -165,6 +165,10 @@ export const ManagerTicketProvider = ({ children }) => {
   }, []);
 
   const addComment = useCallback(async (incidentKey, text, authorName, isInternal = false) => {
+    console.log(incidentKey);
+    console.log(text);
+    console.log(authorName);
+    console.log(isInternal);
     const res = await addManagerComment(incidentKey, text, isInternal);
     const comment = {
       id: res.id, author: res.user?.name ?? authorName ?? 'You',

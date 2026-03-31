@@ -13,7 +13,7 @@ const EmployeeTickets = () => {
       <div className="animate-fade-in">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-gray-900">My Tickets</h2>
-          <p className="text-sm text-gray-500 mt-0.5">All incidents raised by you.</p>
+          {/* <p className="text-sm text-gray-500 mt-0.5">All incidents raised by you.</p> */}
         </div>
         <MyTicketsList
           tickets={tickets}

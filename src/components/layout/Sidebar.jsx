@@ -25,6 +25,8 @@ const Icons = {
   ChevronLeft:  () => <Icon><polyline points="15 18 9 12 15 6"/></Icon>,
   ChevronRight: () => <Icon><polyline points="9 18 15 12 9 6"/></Icon>,
   MyTickets:    () => <Icon><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 11l1.5 1.5L21 9"/></Icon>,
+  Menu:         () => <Icon><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></Icon>,
+  X:            () => <Icon><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>,
 };
 
 /* ── Nav config per role ─────────────────────────────────────── */
@@ -36,6 +38,7 @@ const NAV_ITEMS = {
   SUPPORT_STAFF: [
     { label: 'Overview',      to: '/dashboard/support',          icon: <Icons.Grid />,   end: true },
     { label: 'My Queue',      to: '/dashboard/support/queue',    icon: <Icons.Clock /> },
+    { label: 'My Tickets',    to: '/dashboard/support/my-tickets',    icon: <Icons.Ticket /> },
   ],
   MANAGER: [
     { label: 'Overview',      to: '/dashboard/manager',              icon: <Icons.Grid />,      end: true },
@@ -61,40 +64,19 @@ const ROLE_LABELS = {
   MANAGER: 'Manager',   ADMIN: 'Admin',
 };
 
-/* ── Pratiti petal logo ──────────────────────────────────────── */
-const PetalLogo = ({ size = 30 }) => (
-  <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-    <ellipse cx="14" cy="14" rx="7" ry="11" fill="#14a0c8" opacity="0.95" transform="rotate(-45 14 14)" />
-    <ellipse cx="26" cy="14" rx="7" ry="11" fill="#eeeef8" opacity="0.90" transform="rotate(45 26 14)" />
-    <ellipse cx="14" cy="26" rx="7" ry="11" fill="#b07ab0" opacity="0.90" transform="rotate(45 14 26)" />
-    <ellipse cx="26" cy="26" rx="7" ry="11" fill="#28b8dc" opacity="0.80" transform="rotate(-45 26 26)" />
-  </svg>
-);
-
-/* ── Sidebar ─────────────────────────────────────────────────── */
-const Sidebar = () => {
+/* ── Sidebar inner content ───────────────────────────────────── */
+const SidebarContent = ({ collapsed, setCollapsed, onNavClick }) => {
   const { user, handleLogout } = useAuthContext();
   const navigate               = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
-
   const navItems = NAV_ITEMS[user?.role] ?? [];
-  const onLogout = () => { handleLogout(); navigate('/login', { replace: true }); };
 
   return (
-    <aside
-      className="h-screen flex flex-col shrink-0 transition-all duration-300 ease-in-out"
-      style={{
-        width: collapsed ? 64 : 240,
-        background: 'linear-gradient(180deg, #1a1a4e 0%, #252568 40%, #3c3c8c 100%)',
-        boxShadow: '4px 0 32px rgba(26,26,78,0.30)',
-      }}
-    >
+    <div className="flex flex-col h-full">
       {/* ── Logo ── */}
       <div
         className={`flex items-center h-16 px-4 shrink-0 ${collapsed ? 'justify-center' : 'gap-3'}`}
         style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}
       >
-        <PetalLogo size={28} />
         {!collapsed && (
           <div>
             <p className="text-white font-semibold text-sm leading-tight tracking-tight">IIMP</p>
@@ -104,23 +86,6 @@ const Sidebar = () => {
           </div>
         )}
       </div>
-
-      {/* ── User pill ── */}
-      {/* {!collapsed && (
-        <div className="mx-3 mt-4 mb-2 px-3 py-2.5 rounded-xl flex items-center gap-2.5"
-          style={{ background: 'rgba(20,160,200,0.12)', border: '1px solid rgba(20,160,200,0.20)' }}>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 text-white"
-            style={{ background: 'linear-gradient(135deg,#14a0c8,#0080b0)' }}>
-            {user?.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2)}
-          </div>
-          <div className="overflow-hidden flex-1">
-            <p className="text-xs font-medium text-white truncate leading-tight">{user?.fullName}</p>
-            <p className="text-[10px] truncate leading-tight font-medium" style={{ color: '#14a0c8' }}>
-              {ROLE_LABELS[user?.role]} · {user?.department}
-            </p>
-          </div>
-        </div>
-      )} */}
 
       {/* ── Nav links ── */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
@@ -137,6 +102,7 @@ const Sidebar = () => {
             end={item.end}
             title={collapsed ? item.label : undefined}
             className="block"
+            onClick={onNavClick}
           >
             {({ isActive }) => (
               <div
@@ -173,10 +139,11 @@ const Sidebar = () => {
       {/* ── Bottom: collapse + logout ── */}
       <div className="px-2 pb-4 pt-2 space-y-0.5"
         style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        {/* Desktop collapse button — hidden on mobile */}
         <button
           onClick={() => setCollapsed(p => !p)}
           className={`
-            w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200
+            hidden md:flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200
             text-white/70 hover:text-white 
             hover:bg-white/10 active:bg-white/20
             ${collapsed ? 'justify-center' : ''}
@@ -191,19 +158,62 @@ const Sidebar = () => {
             </>
           )}
         </button>
-        {/* <button
-          onClick={onLogout}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs transition-colors ${collapsed ? 'justify-center' : ''}`}
-          style={{ color: 'rgba(255,255,255,0.30)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.15)'; e.currentTarget.style.color = '#fca5a5'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.30)'; }}
-        >
-          <Icons.Logout />
-          {!collapsed && <span>Logout</span>}
-        </button> */}
       </div>
-    </aside>
+    </div>
   );
 };
 
+/* ── Sidebar ─────────────────────────────────────────────────── */
+const Sidebar = ({ mobileOpen, setMobileOpen }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const sidebarStyle = {
+    background: 'linear-gradient(180deg, #1a1a4e 0%, #252568 40%, #3c3c8c 100%)',
+    boxShadow: '4px 0 32px rgba(26,26,78,0.30)',
+  };
+
+  return (
+    <>
+      {/* ── Desktop sidebar ── */}
+      <aside
+        className="hidden md:flex h-screen flex-col shrink-0 transition-all duration-300 ease-in-out"
+        style={{ width: collapsed ? 64 : 240, ...sidebarStyle }}
+      >
+        <SidebarContent collapsed={collapsed} setCollapsed={setCollapsed} onNavClick={undefined} />
+      </aside>
+
+      {/* ── Mobile drawer overlay ── */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ background: 'rgba(26,26,78,0.55)', backdropFilter: 'blur(2px)' }}
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* ── Mobile drawer ── */}
+      <aside
+        className="fixed top-0 left-0 h-full z-50 md:hidden transition-transform duration-300 ease-in-out flex flex-col"
+        style={{
+          width: 240,
+          ...sidebarStyle,
+          transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
+        }}
+      >
+        {/* Close button in drawer */}
+        <div className="absolute top-4 right-3 z-10">
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Icons.X />
+          </button>
+        </div>
+        <SidebarContent collapsed={false} setCollapsed={() => {}} onNavClick={() => setMobileOpen(false)} />
+      </aside>
+    </>
+  );
+};
+
+export { Icons as SidebarIcons };
 export default Sidebar;

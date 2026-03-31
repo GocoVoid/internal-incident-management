@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBadge, PriorityBadge } from './TicketBadge';
 import { useSupportStaff } from '../../hooks/useUsers';
 import { CATEGORY_LIST } from '../../data/mockData';
-
-import { getAuditLog, getComments, addComment } from '../../services/incidentService';
+import { getAuditLog, getComments, getResolutionNote, saveResolutionNote } from '../../services/incidentService';
 
 /* ══════════════════════════════════════════════════════
    Helpers
@@ -112,6 +111,8 @@ const AuditEntry = ({ entry }) => {
     SLA_BREACHED:            { bg: '#fff1f2', text: '#dc2626', border: '#fee2e2' },
     AUTO_ESCALATED_CRITICAL: { bg: '#fff1f2', text: '#dc2626', border: '#fee2e2' },
     COMMENT_ADDED:           { bg: '#faf3fa', text: '#783c78', border: '#f3e8f3' },
+    RESOLUTION_NOTE_ADDED:   { bg: '#f0fdf4', text: '#059669', border: '#d1fae5' },
+    RESOLUTION_NOTE_UPDATED: { bg: '#f0fdf4', text: '#059669', border: '#d1fae5' },
   };
   const style = actionColors[entry.action] ?? { bg: '#f9fafb', text: '#6b7280', border: '#f3f4f6' };
   const note  = entry.oldValue && entry.newValue
@@ -185,7 +186,106 @@ const PrioritySelect = ({ value, onChange }) => {
   );
 };
 
-const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize, onUpdatePriority }) => {
+/* ── Resolution Note Panel ─────────────────────────── */
+const ResolutionNotePanel = ({ ticket, role, user, onSaveResolutionNote }) => {
+  const canEdit = role === 'SUPPORT_STAFF';
+  const canView = role === 'SUPPORT_STAFF' || role === 'MANAGER' || role === 'ADMIN';
+
+  const [note,    setNote]    = useState(ticket.resolutionNote ?? '');
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  /* Sync if ticket prop changes (e.g. after fetch) */
+  useEffect(() => { setNote(ticket.resolutionNote ?? ''); }, [ticket.resolutionNote]);
+
+  if (!canView) return null;
+
+  const handleSave = async () => {
+    if (!note.trim()) return;
+    setLoading(true);
+    try {
+      await onSaveResolutionNote(ticket.id, note.trim());
+      setEditing(false);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } finally { setLoading(false); }
+  };
+
+  const handleCancel = () => {
+    setNote(ticket.resolutionNote ?? '');
+    setEditing(false);
+  };
+
+  return (
+    <div className="rounded-xl p-4 space-y-2"
+      style={{ background: '#f0fdf4', border: '1px solid #d1fae5' }}>
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+            <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+          </svg>
+          <span className="text-xs font-semibold text-green-800 uppercase tracking-widest">Resolution Note</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">
+            Staff · Manager · Admin
+          </span>
+        </div>
+        {canEdit && !editing && (
+          <button onClick={() => setEditing(true)}
+            className="text-[10px] px-2 py-0.5 rounded-lg text-green-700 hover:bg-green-100 transition-colors font-medium">
+            {note ? 'Edit' : '+ Add'}
+          </button>
+        )}
+      </div>
+
+      {/* Success flash */}
+      {success && (
+        <p className="text-xs text-green-700 flex items-center gap-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Resolution note saved.
+        </p>
+      )}
+
+      {/* View / Edit */}
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={4}
+            placeholder="Describe how this ticket was resolved…"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-green-300 focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none bg-white resize-none leading-relaxed text-gray-700"
+          />
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={!note.trim() || loading}
+              className="flex-1 py-1.5 rounded-xl text-xs font-medium text-white disabled:opacity-50 transition-colors"
+              style={{ background: 'linear-gradient(135deg,#059669,#047857)' }}>
+              {loading ? 'Saving…' : 'Save Note'}
+            </button>
+            <button onClick={handleCancel} disabled={loading}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium text-green-700 bg-white border border-green-200 hover:bg-green-50 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : note ? (
+        <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{note}</p>
+      ) : (
+        <p className="text-xs text-green-600 italic">
+          {canEdit ? 'No resolution note yet. Click "+ Add" to add one.' : 'No resolution note added yet.'}
+        </p>
+      )}
+    </div>
+  );
+};
+
+const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize, onUpdatePriority, onSaveResolutionNote }) => {
   const [comment,  setComment]  = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [assignTo, setAssignTo] = useState('');
@@ -227,8 +327,9 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
     if (!comment.trim()) return;
     setLoading('comment');
     try {
-      await onAddComment(ticket.id, comment.trim(), user?.fullName, isInternal);
-      console.log(isInternal);
+      const response = await onAddComment(ticket.id, comment.trim(), user?.fullName, isInternal);
+      // console.log(response);
+      // console.log(isInternal," in TicketDetailModal (231)");
       setComment('');
       setIsInternal(false);
       flash('Comment posted.');
@@ -237,7 +338,7 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
 
   const selCls = 'flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none bg-white';
 
-  if (role === 'EMPLOYEE') return null;
+  //if (role === 'EMPLOYEE') return null;
 
   return (
     <div className="space-y-4 pt-4" style={{ borderTop: '1px solid #f3f4f6' }}>
@@ -294,8 +395,6 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
         </div>
       )}
 
-
-
       {/* Add comment */}
       <div>
         <p className="text-[10px] font-medium text-gray-500 mb-2 uppercase tracking-wide">Add comment</p>
@@ -325,15 +424,16 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
 ══════════════════════════════════════════════════════ */
 const TicketDetailModal = ({
   ticket: initialTicket, isOpen, onClose,
-  role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize, onUpdatePriority,
+  role, user, onUpdateStatus, onAssign, onAddComment, onRecategorize, onUpdatePriority, onSaveResolutionNote,
 }) => {
   const [ticket,    setTicket]    = useState(initialTicket);
   const [activeTab, setActiveTab] = useState('comments');
   const [auditLog,  setAuditLog]  = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState(initialTicket?.resolutionNote ?? '');
 
-  useEffect(() => { setTicket(initialTicket); }, [initialTicket]);
+  useEffect(() => { setTicket(initialTicket); setResolutionNote(initialTicket?.resolutionNote ?? ''); }, [initialTicket]);
 
   /* Fetch comments from server when comments tab opened */
   const fetchComments = useCallback(async () => {
@@ -380,7 +480,31 @@ const TicketDetailModal = ({
     if (activeTab === 'audit') fetchAudit();
   }, [activeTab, fetchAudit]);
 
-  /* ESC to close */
+  /* Fetch resolution note when modal opens (SUPPORT_STAFF / MANAGER / ADMIN only) */
+  const fetchResolutionNote = useCallback(async () => {
+    if (!ticket?.id) return;
+    if (role !== 'SUPPORT_STAFF' && role !== 'MANAGER' && role !== 'ADMIN') return;
+    try {
+      const data = await getResolutionNote(ticket.id);
+      // console.log(data[0].note);
+      const note = data[0]?.note ?? '';
+      setResolutionNote(note);
+      setTicket(p => ({ ...p, resolutionNote: note }));
+    } catch { /* keep existing */ }
+  }, [ticket?.id, role]);
+
+  useEffect(() => {
+    if (isOpen && ticket?.id) fetchResolutionNote();
+  }, [isOpen, ticket?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Handle save resolution note — optimistic update */
+  const handleSaveResolutionNote = async (id, note) => {
+    await onSaveResolutionNote(id, note);
+    setResolutionNote(note);
+    setTicket(p => ({ ...p, resolutionNote: note }));
+  };
+
+
   useEffect(() => {
     if (!isOpen) return;
     const fn = (e) => { if (e.key === 'Escape') onClose(); };
@@ -434,19 +558,23 @@ const TicketDetailModal = ({
   const tabs = [
     { key: 'description', label: 'Description' },
     { key: 'comments',    label: `Comments (${ticket.comments?.length ?? 0})` },
+    ...(role === 'SUPPORT_STAFF' || role === 'MANAGER' || role === 'ADMIN'
+      ? [{ key: 'resolution', label: 'Resolution Note' }]
+      : []),
     ...(role === 'MANAGER' || role === 'ADMIN'
       ? [{ key: 'audit', label: 'Audit Trail' }]
       : []),
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ paddingTop: "72px" }}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-3" style={{ paddingTop: "0" }}>
       <div className="absolute inset-0 animate-fade-in"
         style={{ background: 'rgba(26,26,78,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose} />
 
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl animate-slide-up flex flex-col"
-        style={{ maxHeight: 'calc(100vh - 88px)', boxShadow: '0 32px 80px rgba(26,26,78,0.25), 0 8px 24px rgba(26,26,78,0.12)' }}>
+      <div className="relative w-full sm:max-w-4xl bg-white rounded-t-2xl sm:rounded-2xl animate-slide-up flex flex-col"
+        style={{ maxHeight: 'calc(100vh - 0px)', height: '100dvh', boxShadow: '0 32px 80px rgba(26,26,78,0.25), 0 8px 24px rgba(26,26,78,0.12)' }}
+        ref={el => { if (el) { if (window.innerWidth >= 640) { el.style.height = ''; el.style.maxHeight = 'calc(100vh - 80px)'; } else { el.style.height = '92dvh'; el.style.maxHeight = ''; } } }}>
 
         {/* Header */}
         <div className="flex items-start gap-4 px-6 py-4 shrink-0"
@@ -470,11 +598,10 @@ const TicketDetailModal = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
 
           {/* Left: meta + actions */}
-          <div className="w-1/3 shrink-0 overflow-y-auto p-5 space-y-1"
-            style={{ borderRight: '1px solid #f3f4f6' }}>
+          <div className="w-full sm:w-1/3 shrink-0 overflow-y-auto p-4 sm:p-5 space-y-1 border-b sm:border-b-0 sm:border-r border-gray-100">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Details</p>
             <MetaRow label="Category">{ticket.category}</MetaRow>
             <MetaRow label="Department">{ticket.department ?? '—'}</MetaRow>
@@ -519,7 +646,7 @@ const TicketDetailModal = ({
                         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
                         <polyline points="14 2 14 8 20 8"/>
                       </svg>
-                      <a href={a.fileUrl ?? '#'} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://iimp-backend.duckdns.org${a.fileUrl}` ?? '#'} target="_blank" rel="noopener noreferrer"
                         className="truncate text-indigo-600 hover:underline">
                         {a.fileName ?? `File ${i + 1}`}
                       </a>
@@ -536,16 +663,17 @@ const TicketDetailModal = ({
               onAddComment={handleAddComment}
               onRecategorize={handleRecategorize}
               onUpdatePriority={handleUpdatePriority}
+              onSaveResolutionNote={handleSaveResolutionNote}
             />
           </div>
 
           {/* Right: tabs */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex items-center px-5 pt-4 gap-1 shrink-0"
+            <div className="flex items-center px-3 sm:px-5 pt-4 gap-1 shrink-0 overflow-x-auto"
               style={{ borderBottom: '1px solid #f3f4f6' }}>
               {tabs.map(t => (
                 <button key={t.key} onClick={() => setActiveTab(t.key)}
-                  className="px-4 py-2 text-xs font-medium rounded-t-xl transition-colors"
+                  className="px-3 sm:px-4 py-2 text-xs font-medium rounded-t-xl transition-colors whitespace-nowrap shrink-0"
                   style={activeTab === t.key
                     ? { color: '#3c3c8c', background: '#f5f5fc', borderBottom: '2px solid #3c3c8c' }
                     : { color: '#9ca3af' }}>
@@ -581,10 +709,48 @@ const TicketDetailModal = ({
                     </div>
                   ) : (
                     ticket.comments
-                      .filter(c => role !== 'EMPLOYEE' || !c.isInternal)
                       .map(c => (
                         <CommentBubble key={c.id} comment={c} isOwn={c.author === user?.fullName} />
                       ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'resolution' && (
+                <div className="animate-fade-in">
+                  {/* <div className="flex items-center gap-2 mb-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Resolution Note</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+                      Staff · Manager · Admin only
+                    </span>
+                  </div> */}
+                  {resolutionNote ? (
+                    <div className="rounded-xl p-4 space-y-3"
+                      style={{ background: '#f0fdf4', border: '1px solid #d1fae5' }}>
+                      <div className="flex items-center gap-2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2"
+                          strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0">
+                          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                        </svg>
+                        <span className="text-xs font-semibold text-green-800">How it was resolved</span>
+                      </div>
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{resolutionNote}</p>
+                      {ticket.resolvedAt && (
+                        <p className="text-[10px] text-green-600">Resolved on {formatDateTime(ticket.resolvedAt)}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                        strokeLinecap="round" strokeLinejoin="round"
+                        className="w-8 h-8 text-gray-300 mx-auto mb-3">
+                        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                      </svg>
+                      <p className="text-sm text-gray-400">No resolution note yet.</p>
+                      {/* {role === 'SUPPORT_STAFF' && (
+                        <p className="text-xs text-gray-400 mt-1">Use the panel on the left to add one.</p>
+                      )} */}
+                    </div>
                   )}
                 </div>
               )}

@@ -100,10 +100,10 @@ const LoginPage = () => (
             One portal for every<br />
             <span className="font-light" style={{ color: '#28b8dc' }}>incident, resolved.</span>
           </h2>
-          <p className="text-white/60 text-sm leading-relaxed max-w-sm">
+          {/* <p className="text-white/60 text-sm leading-relaxed max-w-sm">
             Streamline how your organisation reports, tracks, and resolves
             internal issues — with full visibility at every level.
-          </p>
+          </p> */}
         </div>
         <ul className="space-y-4">
           {features.map((f, i) => (

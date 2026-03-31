@@ -312,6 +312,8 @@ export const AdminUsers = () => {
 /* ══════════════════════════════════════
    Admin Reports
 ══════════════════════════════════════ */
+// Assume DashboardLayout, LoadingState, ErrorState, useChart, useChartJS, PALETTE, and API methods are imported correctly.
+
 export const AdminReports = () => {
   const [period, setPeriod] = useState('Weekly');
   const chartjsLoaded = useChartJS();
@@ -328,18 +330,21 @@ export const AdminReports = () => {
   const [exporting,   setExporting]   = useState(false);
 
   /* Map UI label → API range param */
-  const PERIOD_MAP = { Daily: 'day', Weekly: 'week', Monthly: 'month' };
+  const PERIOD_MAP = { Weekly: 'week', Monthly: 'month' };
 
   const fetchReports = useCallback(async () => {
     setRLoading(true); setRError(null);
     try {
       const range = PERIOD_MAP[period] ?? 'week';
+      
+      // Pass the 'range' parameter to ALL relevant API calls so the whole dashboard updates
       const [s, v, daily, c] = await Promise.all([
-        getReportSummary(),
+        getReportSummary({ range }),         // <-- Added range here
         getTicketVolume({ range }),
         getTicketVolume({ range: 'day' }),   // always fetch daily for breakdown
-        getCategoryBreakdown(),
+        getCategoryBreakdown({ range }),     // <-- Added range here
       ]);
+      
       setSummary(s);
       setVolume(v ?? []);
       setDailyVol(daily ?? []);
@@ -385,60 +390,45 @@ export const AdminReports = () => {
         tooltip: { backgroundColor: '#1a1a4e', cornerRadius: 8, padding: 10 } } },
   }, [chartjsLoaded, catBreak]);
 
-  // const handleExport = async () => {
-  //   setExporting(true);
-  //   try {
-  //     const base  = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:1111/api';
-  //     const token = localStorage.getItem('iimp_refresh_token') ?? sessionStorage.getItem('iimp_refresh_token') ?? '';
-  //     console.log(token);
-  //     const url   = `${base}/reports/export?format=csv`;
-  //     const res   = buildExportUrl(url, {
-  //       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-  //     });
-  //     if (!res.ok) throw new Error(`Export failed (${res.status})`);
-  //     const blob = await res.blob();
-  //     const link = document.createElement('a');
-  //     link.href     = URL.createObjectURL(blob);
-  //     link.download = `IIMP_Report_${period}_${new Date().toISOString().split('T')[0]}.csv`;
-  //     document.body.appendChild(link);
-  //     link.click();
-  //     document.body.removeChild(link);
-  //     URL.revokeObjectURL(link.href);
-  //   } catch (err) {
-  //     alert(err?.message ?? 'Export failed. Please try again.');
-  //   } finally { setExporting(false); }
-  // };
-
   const handleExport = () => {
     setExporting(true);
     try {
-      // 1. Define your data source (Replace 'reportData' with your actual state/variable)
-      // If your data isn't formatted yet, do it here.
-      const dataToExport = reportData || []; 
-  
-      if (dataToExport.length === 0) {
-        throw new Error("No data available to export.");
+      let csvContent = "SYSTEM REPORT EXPORT\n";
+      csvContent += `Generated on: ${new Date().toLocaleString()}\n`;
+      csvContent += `Period View: ${period}\n\n`;
+
+      if (summary) {
+        csvContent += "--- SUMMARY STATISTICS ---\n";
+        csvContent += "Metric,Value\n";
+        csvContent += `Total Today,${summary.totalToday ?? 0}\n`;
+        csvContent += `SLA Compliance (%),${summary.slaCompliance ?? 0}\n`;
+        csvContent += `SLA Breached,${summary.breachedCount ?? 0}\n`;
+        csvContent += `Open Tickets,${summary.openCount ?? 0}\n\n`;
       }
-  
-      // 2. Generate CSV Content
-      // Get headers from the keys of the first object
-      const headers = Object.keys(dataToExport[0]).join(",");
-      
-      // Map rows and handle potential commas in data by wrapping in quotes
-      const rows = dataToExport.map(row => 
-        Object.values(row)
-          .map(value => `"${String(value).replace(/"/g, '""')}"`) // Escape quotes and wrap in quotes
-          .join(",")
-      );
-  
-      const csvContent = [headers, ...rows].join("\n");
-  
-      // 3. Create a Blob from the CSV string
+
+      if (volume && volume.length > 0) {
+        csvContent += "--- VOLUME TREND ---\n";
+        csvContent += "Date/Label,Ticket Count\n";
+        volume.forEach(item => {
+          const safeLabel = `"${String(item.label).replace(/"/g, '""')}"`;
+          csvContent += `${safeLabel},${item.count}\n`;
+        });
+        csvContent += "\n";
+      }
+
+      if (catBreak && catBreak.length > 0) {
+        csvContent += "--- CATEGORY BREAKDOWN ---\n";
+        csvContent += "Category,Ticket Count\n";
+        catBreak.forEach(item => {
+          const safeLabel = `"${String(item.label).replace(/"/g, '""')}"`;
+          csvContent += `${safeLabel},${item.count}\n`;
+        });
+        csvContent += "\n";
+      }
+
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      
-      // 4. Trigger Download (Same logic as before)
-      const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
       
       link.setAttribute('href', url);
       link.setAttribute('download', `IIMP_Report_${period}_${new Date().toISOString().split('T')[0]}.csv`);
@@ -448,9 +438,9 @@ export const AdminReports = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-  
+
     } catch (err) {
-      console.error(err);
+      console.error("Export Error:", err);
       alert(err?.message ?? 'Export failed. Please try again.');
     } finally {
       setExporting(false);
@@ -460,22 +450,24 @@ export const AdminReports = () => {
   return (
     <DashboardLayout title="Reports">
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start flex-wrap gap-3 justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">System Reports</h2>
-            {/* <p className="text-sm text-gray-500 mt-0.5">System-wide analytics and SLA performance.</p> */}
           </div>
           <div className="flex items-center gap-3">
-            {/* <div className="flex rounded-xl overflow-hidden border border-gray-200">
-              {['Daily','Weekly','Monthly'].map(p => (
+            
+            {/* The Period Toggle Buttons */}
+            <div className="flex rounded-xl overflow-hidden border border-gray-200">
+              {['Weekly','Monthly'].map(p => (
                 <button key={p} onClick={() => setPeriod(p)}
                   className="px-4 py-2 text-xs font-medium transition-colors"
                   style={period === p ? { background: '#3c3c8c', color: '#fff' } : { background: '#fff', color: '#6b7280' }}>
                   {p}
                 </button>
               ))}
-            </div> */}
-            <button onClick={handleExport} disabled={exporting}
+            </div>
+
+            <button onClick={handleExport} disabled={exporting || rLoading || !!rError}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors disabled:opacity-60"
               style={{ color: '#3c3c8c', borderColor: '#c5c5e8', background: '#fff' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -520,11 +512,6 @@ export const AdminReports = () => {
                   <p className="text-xs text-gray-400 mb-4">Distribution across departments</p>
                   <div style={{ height: 200 }}><canvas ref={doughRef} /></div>
                 </div>
-                {/* <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5 lg:col-span-2">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Daily Breakdown</h3>
-                  <p className="text-xs text-gray-400 mb-4">Ticket count per day (current period)</p>
-                  <div style={{ height: 200 }}><canvas ref={barRef} /></div>
-                </div> */}
               </div>
             )}
           </>
@@ -656,7 +643,7 @@ export const AdminCategories = () => {
   return (
     <DashboardLayout title="Categories & Departments">
       <div className="space-y-5 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start flex-wrap gap-3 justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Categories & Departments</h2>
             {/* <p className="text-sm text-gray-500 mt-0.5">Manage ticket categories and their associated departments.</p> */}
@@ -686,6 +673,7 @@ export const AdminCategories = () => {
               )}
               <span className="ml-auto text-xs text-gray-400">{displayed.length} of {categories.length} categor{categories.length !== 1 ? 'ies' : 'y'}</span>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
@@ -714,6 +702,7 @@ export const AdminCategories = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
 import { AdminTicketProvider } from './context/AdminTicketContext';
 import { ManagerTicketProvider } from './context/ManagerTicketContext';
+import StaffMyTickets from './pages/support/StaffMyTickets';
 
 /* ── Pages ───────────────────────────────────────────────────── */
 import LoginPage            from './pages/LoginPage';
@@ -81,6 +82,7 @@ const AppRoutes = () => (
     {/* Support Staff */}
     <Route path="/dashboard/support"       element={P('SUPPORT_STAFF', <SupportOverview />)} />
     <Route path="/dashboard/support/queue" element={P('SUPPORT_STAFF', <SupportQueue />)} />
+    <Route path="/dashboard/support/my-tickets" element={P('SUPPORT_STAFF', <StaffMyTickets />)} />
 
     {/* Manager — all wrapped in ManagerTicketProvider */}
     <Route path="/dashboard/manager"            element={<ManagerRoute><ManagerOverviewPage /></ManagerRoute>} />

@@ -179,3 +179,45 @@ input:-webkit-autofill:focus {
 .animate-shake {
   animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
+
+/* ── Mobile Responsive Utilities ───────────────────────────── */
+
+/* Safe area insets for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Smooth momentum scrolling on iOS */
+.overflow-y-auto,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent horizontal page scroll */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Touch-friendly tap targets */
+@media (max-width: 640px) {
+  button, [role="button"] {
+    min-height: 36px;
+  }
+
+  /* Ensure modals don't overflow viewport width */
+  [class*="max-w-"] {
+    max-width: min(var(--tw-max-w, 100%), calc(100vw - 1rem));
+  }
+}
+
+/* Sidebar mobile drawer transition */
+.sidebar-drawer-enter {
+  transform: translateX(-100%);
+}
+.sidebar-drawer-enter-active {
+  transform: translateX(0);
+  transition: transform 300ms ease-in-out;
+}

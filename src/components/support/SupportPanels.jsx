@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBadge, PriorityBadge } from '../shared/TicketBadge';
+import { getComments, saveResolutionNote } from '../../services/incidentService';
 
 /* ── Allowed transitions for Support Staff ──────────────── */
 const SUPPORT_TRANSITIONS = {
@@ -17,7 +18,8 @@ const formatDate = (iso) => {
 
 /* ── Update Status Panel ────────────────────────────────── */
 export const UpdateStatusPanel = ({ ticket, onUpdateStatus }) => {
-  const [note,    setNote]    = useState('');
+  const [note,    
+    setNote]    = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
 
@@ -29,7 +31,7 @@ export const UpdateStatusPanel = ({ ticket, onUpdateStatus }) => {
     setLoading(true);
     setSuccess('');
     await new Promise((r) => setTimeout(r, 500));
-    onUpdateStatus(ticket.id, newStatus, note);
+    saveResolutionNote(ticket.id, note);
     setSuccess(`Status updated to "${newStatus}"`);
     setNote('');
     setLoading(false);
@@ -98,55 +100,111 @@ export const UpdateStatusPanel = ({ ticket, onUpdateStatus }) => {
 };
 
 /* ── Comment & Attachment Panel ─────────────────────────── */
+
 export const CommentAttachmentPanel = ({ ticket, onAddComment, authorName }) => {
+  const [comments, setComments] = useState([]); // State to store fetched comments
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
-  const [files,   setFiles]   = useState([]);
+  const [fetching, setFetching] = useState(false); // Loading state for the initial fetch
+  const [files, setFiles] = useState([]);
+
+  // Fetch comments whenever the ticket ID changes
+  useEffect(() => {
+    const fetchComments = async () => {
+      if (!ticket?.id) return;
+      
+      setFetching(true);
+      try {
+        const data = await getComments(ticket.id);
+        setComments(data || []);
+        console.log(data);
+      } catch (error) {
+        console.error("Failed to fetch comments:", error);
+      } finally {
+        setFetching(false);
+      }
+    };
+
+    fetchComments();
+  }, [ticket?.id]);
 
   if (!ticket) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!comment.trim()) return;
+    if (!comment.trim() && files.length === 0) return;
+    
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
-    onAddComment(ticket.id, comment.trim(), authorName);
+    // await new Promise((r) => setTimeout(r, 400)); // Simulated delay
+    
+    // Optimistic UI update or manual refresh usually happens via onAddComment
+    await onAddComment(ticket.id, comment.trim(), authorName, files);
+    
+    // Re-fetch comments to show the new one (if onAddComment doesn't update parent state)
+    const updatedComments = await getComments(ticket.id);
+    setComments(updatedComments);
+    
     setComment('');
     setFiles([]);
     setLoading(false);
   };
 
   const handleFiles = (e) => {
-    const picked = Array.from(e.target.files).slice(0, 5 - (ticket.attachments?.length ?? 0));
+    const remaining = 5 - (ticket.attachments?.length ?? 0) - files.length;
+    const picked = Array.from(e.target.files).slice(0, remaining);
     setFiles((p) => [...p, ...picked].slice(0, 5));
+    e.target.value = ''; 
   };
 
+  const removeFile = (idx) => setFiles((p) => p.filter((_, i) => i !== idx));
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5 space-y-4">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
       <h3 className="text-sm font-semibold text-gray-900">Comments & Attachments</h3>
 
       {/* Existing comments */}
       <div className="space-y-3 max-h-52 overflow-y-auto">
-        {ticket.comments?.length === 0 && (
+        {fetching ? (
+          <p className="text-xs text-gray-400 text-center py-4">Loading comments...</p>
+        ) : comments.length === 0 ? (
           <p className="text-xs text-gray-400 text-center py-4">No comments yet. Be the first.</p>
-        )}
-        {ticket.comments?.map((c) => (
-          <div key={c.id} className="flex gap-3">
-            <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center text-[10px] font-semibold text-indigo-700 shrink-0 mt-0.5">
-              {c.author.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-            </div>
-            <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-800">{c.author}</span>
-                <span className="text-[10px] text-gray-400">{formatDate(c.createdAt)}</span>
+        ) : (
+          comments.map((c) => (
+            <div key={c.id} className="flex gap-3">
+              <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center text-[10px] font-semibold text-indigo-700 shrink-0 mt-0.5">
+                {c.user?.name?.charAt(0) || 'U'}
               </div>
-              <p className="text-xs text-gray-700 leading-relaxed">{c.text}</p>
+              <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-gray-800">{c.user.name} {c.user.role ?? ''}</span>
+                  <span className="text-[10px] text-gray-400">
+                    {c.createdAt ? formatDate(c.createdAt) : ''}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-700 leading-relaxed">{c.commentText}</p>
+                
+                {/* Comment Attachments */}
+                {ticket.attachments?.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {ticket.attachments.map((a, i) => (
+                      <a key={i} href={a.url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1.5 text-[10px] text-indigo-500 hover:underline">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+                          strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 shrink-0">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        {a.fileName ?? `Attachment ${i + 1}`}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
-      {/* Add comment */}
       <form onSubmit={handleSubmit} className="space-y-3">
         <textarea
           value={comment}
@@ -156,8 +214,8 @@ export const CommentAttachmentPanel = ({ ticket, onAddComment, authorName }) => 
           className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none resize-none"
         />
 
-        {/* File upload */}
-        <div className="flex items-center gap-3">
+        {/* File upload trigger */}
+        {/* <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 cursor-pointer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
               strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
@@ -166,17 +224,41 @@ export const CommentAttachmentPanel = ({ ticket, onAddComment, authorName }) => 
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
             Attach file
-            <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
-              onChange={handleFiles} className="hidden" />
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+              onChange={handleFiles}
+              className="hidden"
+              disabled={files.length + (ticket.attachments?.length ?? 0) >= 5}
+            />
           </label>
-          {files.length > 0 && (
-            <span className="text-xs text-gray-500">{files.length} file(s) selected</span>
-          )}
-        </div>
+          <span className="text-[10px] text-gray-400">
+            {Math.max(0, 5 - (ticket.attachments?.length ?? 0) - files.length)} slot(s) remaining
+          </span>
+        </div> */}
+
+        {/* Selected file preview */}
+        {/* {files.length > 0 && (
+          <div className="space-y-1.5">
+            {files.map((f, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs text-gray-600 truncate">{f.name}</span>
+                </div>
+                <button type="button" onClick={() => removeFile(i)} className="text-gray-300 hover:text-red-400">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )} */}
 
         <button
           type="submit"
-          disabled={!comment.trim() || loading}
+          disabled={(!comment.trim() && files.length === 0) || loading}
           className="w-full py-2.5 rounded-xl text-sm font-medium text-white bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 transition-colors"
         >
           {loading ? 'Posting…' : 'Post Comment'}

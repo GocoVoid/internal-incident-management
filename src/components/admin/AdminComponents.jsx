@@ -64,6 +64,45 @@ export const SystemKPICards = ({ stats }) => {
   );
 };
 
+export const EmployeeKPICards = ({ stats }) => {
+  const cards = [
+    { label: 'Total Tickets',    value: stats.total,       bg: 'bg-indigo-700', },
+    { label: 'Open',             value: stats.open,        bg: 'bg-cyan-600',   },
+    { label: 'In Progress',      value: stats.inProgress,  bg: 'bg-amber-500',  },
+    { label: 'Resolved',         value: stats.resolved,    bg: 'bg-green-600',  },
+    { label: 'Closed',           value: stats.closed,      bg: 'bg-gray-500',   },
+  ];
+  console.log(stats);
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {cards.map((c) => (
+        <div key={c.label} className={`${c.bg} rounded-2xl p-4 text-white`}>
+          <p className="text-3xl font-bold">{c.value}</p>
+          <p className="text-xs text-white/70 mt-1">{c.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export const SupportKPICards = ({ stats }) => {
+  const cards = [
+    { label: 'Open',        value: stats.assignedOpenCount,       bg: 'bg-cyan-500', },
+    { label: 'In Progress', value: stats.assignedInProgressCount, bg: 'bg-amber-500', },
+    { label: 'Resolved',    value: stats.assignedResolvedCount,   bg: 'bg-green-500', },
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-6">
+      {cards.map((c) => (
+        <div key={c.label} className={`${c.bg} rounded-2xl p-4 text-white`}>
+          <p className="text-3xl font-bold">{c.value}</p>
+          <p className="text-xs text-white/70 mt-1">{c.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 /* ══════════════════════════════════════
    User Management Table
 ══════════════════════════════════════ */
@@ -534,7 +573,7 @@ export const SystemReports = ({ tickets }) => {
         <p className="text-xs text-gray-400 text-center py-4">Loading reports…</p>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
               { label: 'Total today',    value: summary?.totalToday   ?? '—' },
               { label: 'SLA compliance', value: `${compliance}%`             },

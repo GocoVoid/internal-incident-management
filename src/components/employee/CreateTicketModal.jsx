@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import Modal from '../shared/Modal';
 import { DEPARTMENTS_MAP, DEPARTMENT_NAMES, PRIORITIES } from '../../data/mockData';
+import { createIncident, getPriority } from '../../services/incidentService';
+import { uploadFiles } from '../../services/incidentService';
 
 const INITIAL = { title: '', department: '', category: '', priority: '', description: '' };
 
@@ -40,8 +42,7 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
     if (form.title.length > 150)                      e.title       = 'Title must be under 150 characters.';
     if (!form.department)                             e.department  = 'Please select a department.';
     if (!form.category)                               e.category    = 'Please select a category.';
-    if (!form.priority)                               e.priority    = 'Please select a priority.';
-    if (form.description.trim().length < 20)          e.description = 'Description must be at least 20 characters.';
+    if (form.description.trim().length < 40)          e.description = 'Description must be at least 40 characters.';
     return e;
   };
 
@@ -73,8 +74,47 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      await onSubmit({ ...form, attachments: files });
-      setForm(INITIAL); setFiles([]); setErrors({});
+      let text = `Analyse the incident description attached and strictly respond only in single word about the priority of the incident (Low, Medium, High, Critical) => Description : ${form.description}`;
+  
+      const data = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          "model": "nvidia/nemotron-3-super-120b-a12b:free",
+          "messages": [{ "role": "user", "content": text }]
+        })
+      });
+  
+      const response = await data.json();                          // ✅ await the json()
+      const fetchedPriority = response.choices[0].message.content.trim(); // ✅ no .then()
+      console.log(fetchedPriority);
+  
+      const finalForm = { ...form, priority: fetchedPriority };
+      console.log(finalForm);
+      const creationResponse = await createIncident({ ...finalForm}); 
+      console.log(creationResponse);
+      try {
+        const formData = new FormData();
+    
+        files.forEach((file) => {
+          formData.append("file", file);
+        });
+
+        const response = await uploadFiles(creationResponse.incidentKey, formData);
+        const data = await response;
+        console.log("Uploaded:", data);
+    
+      } catch (err) {
+        console.error(err);
+      }
+      
+      // ✅ runs after priority is ready
+      setForm({ title: '', department: '', category: '', priority: '', description: '' });
+      setFiles([]);
+      setErrors({});
       onClose();
     } catch {
       /* keep modal open on error so user can retry */
@@ -119,7 +159,7 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
             </select>
           </Field>
 
-          <Field label="Priority *" error={errors.priority}>
+          {/* <Field label="Priority *" error={errors.priority}>
             <select name="priority" value={form.priority} onChange={handleChange}
               className={inputCls(errors.priority)}>
               <option value="">Select priority</option>
@@ -127,7 +167,7 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
                 <option key={p} value={p} className={PRIORITY_COLORS[p]}>{p}</option>
               ))}
             </select>
-          </Field>
+          </Field> */}
         </div>
 
         {form.department === 'Others' && (
@@ -146,9 +186,9 @@ const CreateTicketModal = ({ isOpen, onClose, onSubmit }) => {
 
         <Field label="Description *" error={errors.description}>
           <textarea name="description" value={form.description} onChange={handleChange}
-            rows={4} placeholder="Describe the issue in detail (minimum 20 characters)"
+            rows={4} placeholder="Describe the issue in detail (minimum 40 characters)"
             className={`${inputCls(errors.description)} resize-none`} />
-          <p className="mt-1 text-[10px] text-gray-400">{form.description.trim().length} / 20 min</p>
+          <p className="mt-1 text-[10px] text-gray-400">{form.description.trim().length} / 40 min</p>
         </Field>
 
         <div>

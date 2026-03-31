@@ -3,8 +3,8 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuthContext } from '../../context/AuthContext';
 import { useTickets } from '../../hooks/useTickets';
 import { useNavigate } from 'react-router-dom';
-import { uploadAttachment } from '../../services/incidentService';
 import { DEPARTMENTS_MAP, DEPARTMENT_NAMES, PRIORITIES } from '../../data/mockData';
+import { uploadFiles } from '../../services/incidentService';
 
 const INITIAL = { title: '', department: '', category: '', priority: '', description: '' };
 
@@ -89,8 +89,22 @@ const EmployeeCreateTicket = () => {
       });
 
       /* Upload attachments sequentially — non-fatal per file */
-      for (const file of files) {
-        try { await uploadAttachment(ticket.id, file); } catch { /* skip */ }
+      // for (const file of files) {
+      //   try { await uploadAttachment(ticket.id, file); } catch { /* skip */ }
+      // }
+      try {
+        const formData = new FormData();
+    
+        files.forEach((file) => {
+          formData.append("file", file);
+        });
+
+        const response = await uploadFiles(ticket.id, formData);
+        const data = await response.json();
+        console.log("Uploaded:", data);
+    
+      } catch (err) {
+        console.error(err);
       }
 
       setSuccess(ticket.id);
@@ -273,6 +287,7 @@ const EmployeeCreateTicket = () => {
                 </svg>
               )}
               {loading ? 'Submitting…' : 'Submit Ticket'}
+              {console.log("I am here in create ticket")}
             </button>
           </div>
         </form>

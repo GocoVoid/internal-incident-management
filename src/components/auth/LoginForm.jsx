@@ -144,6 +144,13 @@ const LoginStage = ({ auth }) => {
     handleLoginSubmit(loginFields);
   };
 
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Morning';
+    if (h < 17) return 'Afternoon';
+    return 'Evening';
+  };
+
   const onForgot = () => {
     const emailErr = validateEmail(loginFields.email);
     if (emailErr) {
@@ -159,7 +166,7 @@ const LoginStage = ({ auth }) => {
       {/* Heading */}
       <div className="mb-8">
         <h2 className="text-2xl font-semibold text-gray-900 tracking-tight animate-slide-up">
-          Welcome back
+          Good {getGreeting()} !
         </h2>
         <p className="mt-1 text-sm text-gray-500 animate-slide-up animate-slide-up-delay-1">
           Sign in with your corporate credentials to continue.

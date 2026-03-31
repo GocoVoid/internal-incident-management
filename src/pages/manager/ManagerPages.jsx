@@ -61,7 +61,7 @@ export const ManagerOverviewPage = () => {
   return (
     <DashboardLayout title="Overview">
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start flex-wrap gap-3 justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">{user?.department} Department</h2>
             <p className="text-sm text-gray-500 mt-0.5">Department incident overview.</p>
@@ -522,24 +522,80 @@ export const ManagerReports = () => {
     Facilities:'bg-amber-500', Finance:'bg-green-500', Others:'bg-gray-400',
   };
 
-  const handleExport = async () => {
+  // const handleExport = async () => {
+  //   try {
+  //     const { default: apiClient } = await import('../../services/apiClient');
+  //     /* Build authenticated download link */
+  //     const base  = import.meta.env.VITE_API_BASE_URL ?? 'https://iimp-backend.duckdns.org/api';
+  //     const token = localStorage.getItem('token') ?? sessionStorage.getItem('token') ?? '';
+  //     const url   = `${base}/reports/export?format=csv`;
+  //     const res   = await fetch(url, {
+  //       headers: { Authorization: token ? `Bearer ${token}` : '' },
+  //     });
+  //     if (!res.ok) throw new Error('Export failed');
+  //     const blob = await res.blob();
+  //     const link = document.createElement('a');
+  //     link.href     = URL.createObjectURL(blob);
+  //     link.download = `IIMP_Report_${reportPeriod}_${new Date().toISOString().split('T')[0]}.csv`;
+  //     link.click();
+  //     URL.revokeObjectURL(link.href);
+  //   } catch {
+  //     alert('Export failed. Please try again.');
+  //   }
+  // };
+
+  const handleExport = () => {
     try {
-      const { default: apiClient } = await import('../../services/apiClient');
-      /* Build authenticated download link */
-      const base  = import.meta.env.VITE_API_BASE_URL ?? 'http://192.168.0.205:1111/api';
-      const token = localStorage.getItem('token') ?? sessionStorage.getItem('token') ?? '';
-      const url   = `${base}/reports/export?format=csv`;
-      const res   = await fetch(url, {
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
-      });
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
+      // 1. Initialize the CSV string
+      let csvContent = "Department Reports Export\n\n";
+
+      // 2. Section 1: Summary Metrics
+      csvContent += "--- SUMMARY METRICS ---\n";
+      csvContent += "Metric,Value\n";
+      csvContent += `SLA Compliance,${compliance}%\n`;
+      csvContent += `Total Today,${reportSummary?.totalToday ?? 0}\n`;
+      csvContent += `Report Period,${PERIOD_LABELS[reportPeriod] ?? 'Weekly'}\n\n`;
+
+      // 3. Section 2: Volume Trend Data
+      csvContent += "--- VOLUME TREND ---\n";
+      csvContent += "Time Label,Ticket Count\n";
+      if (ticketVolume && ticketVolume.length > 0) {
+        ticketVolume.forEach(d => {
+          csvContent += `"${d.label}",${d.count}\n`;
+        });
+      } else {
+        csvContent += "No data available\n";
+      }
+      csvContent += "\n";
+
+      // 4. Section 3: Category Breakdown
+      csvContent += "--- CATEGORY BREAKDOWN ---\n";
+      csvContent += "Category,Ticket Count\n";
+      if (catBreakdown && catBreakdown.length > 0) {
+        catBreakdown.forEach(c => {
+          csvContent += `"${c.label}",${c.count}\n`;
+        });
+      } else {
+        csvContent += "No data available\n";
+      }
+
+      // 5. Convert the string into a downloadable Blob
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      
+      // 6. Trigger the download
       const link = document.createElement('a');
-      link.href     = URL.createObjectURL(blob);
+      link.href = url;
       link.download = `IIMP_Report_${reportPeriod}_${new Date().toISOString().split('T')[0]}.csv`;
+      
+      // Append to body (required for Firefox compatibility), click, and cleanup
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(link.href);
-    } catch {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error("Export generation failed:", error);
       alert('Export failed. Please try again.');
     }
   };
@@ -647,7 +703,7 @@ export const ManagerReports = () => {
             </div>
 
             {/* Daily Breakdown — always day-level granularity */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5 lg:col-span-2">
+            {/* <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5 lg:col-span-2">
               <h3 className="text-sm font-semibold text-gray-900 mb-1">Daily Breakdown</h3>
               <p className="text-xs text-gray-400 mb-4">Ticket count per day of the current period</p>
               {dailyLoading ? (
@@ -666,7 +722,7 @@ export const ManagerReports = () => {
                   ))}
                 </div>
               )}
-            </div>
+            </div> */}
 
           </div>
         )}
@@ -744,7 +800,7 @@ export const ManagerMyTickets = () => {
               All tickets you have personally created.
             </p>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+          {/* <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
             style={{ background: 'rgba(60,60,140,0.08)', color: '#3c3c8c', border: '1px solid rgba(60,60,140,0.15)' }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
               strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
@@ -752,7 +808,7 @@ export const ManagerMyTickets = () => {
               <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
             </svg>
             {user?.fullName}
-          </div>
+          </div> */}
         </div>
 
         {loading ? <LoadingState /> : error ? <ErrorState message={error} onRetry={refetch} /> : (

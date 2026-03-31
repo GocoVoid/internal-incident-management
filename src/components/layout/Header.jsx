@@ -7,6 +7,13 @@ import { createIncident } from '../../services/incidentService';
 import { AdminTicketContext } from '../../context/AdminTicketContext';
 
 
+const HamburgerIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+);
+
 const BellIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
     strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -108,19 +115,20 @@ const NotifRow = ({ n, onExpand, expanded, onMarkRead, userRole, navigate }) => 
 };
 
 /* ── Header ── */
-const Header = ({ title }) => {
+const Header = ({ title, onMenuClick }) => {
   const { user, handleLogout }  = useAuthContext();
   const navigate                = useNavigate();
   const [showNotifs,   setShowNotifs]   = useState(false);
   const [expandedId,   setExpandedId]   = useState(null);
   const [showCreate,   setShowCreate]   = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
 
   /* Use context createTicket for admin so dashboard refreshes; direct call for other roles */
   const adminCtx  = React.useContext(AdminTicketContext);
   const handleCreateTicket = async (data) => {
     if (adminCtx?.createTicket) return adminCtx.createTicket(data);
-    return createIncident({ title: data.title, description: data.description, priority: data.priority, category: data.category });
+    return createIncident({ title: data.title, description: data.description, priority: "Medium", category: data.category });
   };
 
   const badgeCount  = Math.min(unreadCount, 9);
@@ -138,6 +146,13 @@ const Header = ({ title }) => {
 
         {/* Left */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={onMenuClick}
+            className="md:hidden flex items-center justify-center w-8 h-8 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
+          >
+            <HamburgerIcon />
+          </button>
           <div className="w-0.5 h-6 rounded-full shrink-0"
             style={{ background:'linear-gradient(to bottom,#14a0c8,#3c3c8c)' }} />
           <h1 className="text-sm font-semibold text-gray-900 tracking-tight truncate">{title}</h1>
@@ -181,7 +196,7 @@ const Header = ({ title }) => {
             {showNotifs && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowNotifs(false)} />
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl z-40 overflow-hidden animate-slide-up"
+                <div className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-auto sm:top-full mt-2 sm:w-80 bg-white rounded-2xl z-40 overflow-hidden animate-slide-up"
                   style={{ boxShadow:'0 8px 32px rgba(60,60,140,0.16)', border:'1px solid #e5e7eb' }}>
 
                   {/* Header */}
@@ -227,7 +242,7 @@ const Header = ({ title }) => {
           </div>
 
           {/* Avatar */}
-          <div className="flex items-center gap-2.5 pl-1">
+          {/* <div className="flex items-center gap-2.5 pl-1">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0"
               style={{ background:'linear-gradient(135deg,#3c3c8c,#783c78)' }}>
               {initials}
@@ -235,8 +250,83 @@ const Header = ({ title }) => {
             <div className="hidden md:block">
               <p className="text-xs font-semibold text-gray-900 leading-tight">{user?.fullName ?? user?.name}</p>
               {/* <p className="text-[10px] leading-tight" style={{ color:'#9ca3af' }}>{user?.role} - {user?.department}</p> */}
-            </div>
+            {/* </div>
+          </div> */}
+
+          {/* Avatar */}
+<div className="relative">
+  <div
+    className="flex items-center gap-2.5 pl-1 cursor-pointer rounded-xl px-2 py-1 transition-colors"
+    onClick={() => setShowProfile(p => !p)}
+    style={{ background: showProfile ? '#f0f0fa' : 'transparent' }}
+    onMouseEnter={e => e.currentTarget.style.background = '#f0f0fa'}
+    onMouseLeave={e => { if (!showProfile) e.currentTarget.style.background = 'transparent'; }}
+  >
+    <div
+      className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0"
+      style={{ background: 'linear-gradient(135deg,#3c3c8c,#783c78)' }}
+    >
+      {initials}
+    </div>
+    <div className="hidden md:block">
+      <p className="text-xs font-semibold text-gray-900 leading-tight">{user?.fullName ?? user?.name}</p>
+    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round"
+      className="hidden md:block w-3 h-3 text-gray-400 transition-transform"
+      style={{ transform: showProfile ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </div>
+
+  {showProfile && (
+    <>
+      <div className="fixed inset-0 z-30" onClick={() => setShowProfile(false)} />
+      <div
+        className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-1rem)] bg-white rounded-2xl z-40 overflow-hidden animate-slide-up"
+        style={{ boxShadow: '0 8px 32px rgba(60,60,140,0.16)', border: '1px solid #e5e7eb' }}
+      >
+        {/* Top gradient strip */}
+        <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg,#3c3c8c,#783c78)' }} />
+
+        {/* Avatar + name */}
+        <div className="flex items-center gap-3 px-4 py-4" style={{ borderBottom: '1px solid #f3f4f6' }}>
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white shrink-0"
+            style={{ background: 'linear-gradient(135deg,#3c3c8c,#783c78)' }}
+          >
+            {initials}
           </div>
+          <div className="min-w-0">
+            <p className="text-m font-semibold text-gray-900 leading-tight truncate">
+              {user?.fullName ?? user?.name}
+            </p>
+            <p className="text-[12px] text-gray-400 truncate mt-0.5">{user?.email}</p>
+          </div>
+        </div>
+
+        {/* Detail rows */}
+        <div className="px-4 py-3 space-y-2.5">
+          {[
+            { label: 'Role',       value: ROLE_LABELS[user?.role] ?? user?.role },
+            { label: 'Department', value: user?.department ?? '—' },
+            { label: 'Email',      value: user?.email ?? '—' },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-[12px] text-gray-400 shrink-0">{label}</span>
+              <span
+                className="text-[12px] font-medium text-gray-700 truncate text-right min-w-0"
+                title={value}
+              >
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )}
+</div>
 
           {/* Logout */}
           <button onClick={onLogout}
