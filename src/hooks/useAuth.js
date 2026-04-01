@@ -181,6 +181,8 @@ export const useAuth = () => {
     return errs;
   };
 
+  const[token, setToken] = useState('');
+
   /* ── Send OTP (called from CHANGE_PASSWORD stage) ── */
   const handleSendOtp = useCallback(async () => {
     const errs = validateCp(cpFields, purpose);
@@ -192,6 +194,8 @@ export const useAuth = () => {
 
     try {
       const res = await sendOtp(email, purpose);
+      setToken(res?.data?.token);
+      console.log(res.data.token);
       if (res?.success) {
         setOtp(['', '', '', '', '', '']);
         setOtpError('');
@@ -229,10 +233,10 @@ export const useAuth = () => {
 
     try {
       if (purpose=='FORGOT_PASSWORD') {
-        await forgotPassword(email, cpFields.newPassword, otpCode, purpose);
+        await forgotPassword(email, cpFields.newPassword, otpCode, token, purpose);
       }
       else {
-        await changePassword(email, cpFields.oldPassword, cpFields.newPassword, otpCode, purpose);
+        await changePassword(email, cpFields.oldPassword, cpFields.newPassword, otpCode, token, purpose);
       }
 
       /* Success — go back to login with a success banner */

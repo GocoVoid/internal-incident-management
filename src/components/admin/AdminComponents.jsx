@@ -435,80 +435,130 @@ export const SLAConfigPanel = () => {
   const [editing, setEditing] = useState(null);
   const [saved,   setSaved]   = useState(false);
   const [loading, setLoading] = useState(true);
-
+ 
   React.useEffect(() => {
     getSLAConfig()
       .then(data => setConfig(data ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
+ 
   const handleChange = (id, val) =>
     setConfig(p => p.map(c => c.id === id ? { ...c, resolutionTimeHours: Number(val) } : c));
-
+ 
   const handleSave = async () => {
-    const item = config.find(c => c.id === editing);
-    if (item) await updateSLAConfig(item.id, item.resolutionTimeHours);
+    const itemsToSave = editing !== null
+      ? config.filter(c => c.id === editing)
+      : config;
+    await Promise.all(
+      itemsToSave.map(item => updateSLAConfig(item.id, item.resolutionTimeHours))
+    );
     setSaved(true);
     setEditing(null);
     setTimeout(() => setSaved(false), 3000);
   };
-
-  const PRIORITY_COLORS = {
-    Low: 'text-green-600 bg-green-50 border-green-200',
-    Medium: 'text-amber-600 bg-amber-50 border-amber-200',
-    High: 'text-orange-600 bg-orange-50 border-orange-200',
-    Critical: 'text-red-600 bg-red-50 border-red-200',
+ 
+  const PRIORITY_META = {
+    Low:      { pill: 'text-green-700 bg-green-50 border-green-200',   bar: 'bg-green-400',  icon: '●' },
+    Medium:   { pill: 'text-amber-700 bg-amber-50 border-amber-200',   bar: 'bg-amber-400',  icon: '●' },
+    High:     { pill: 'text-orange-700 bg-orange-50 border-orange-200', bar: 'bg-orange-400', icon: '●' },
+    Critical: { pill: 'text-red-700 bg-red-50 border-red-200',         bar: 'bg-red-500',    icon: '●' },
   };
-
+ 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-pratiti-sm p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-900">SLA Configuration</h3>
-        <button onClick={handleSave}
-          className="px-3 py-1.5 rounded-xl text-xs font-medium text-white bg-indigo-700 hover:bg-indigo-800 transition-colors">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">SLA Configuration</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Click a value to edit its resolution time.</p>
+        </div>
+        <button
+          onMouseDown={e => e.preventDefault()}
+          onClick={handleSave}
+          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white bg-indigo-700 hover:bg-indigo-800 transition-colors">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+          </svg>
           Save Changes
         </button>
       </div>
-
+ 
       {saved && (
-        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-green-50 border border-green-200 animate-fade-in">
+        <div className="mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-green-50 border border-green-200 animate-fade-in">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            className="w-3.5 h-3.5 text-green-600">
+            className="w-3.5 h-3.5 text-green-600 shrink-0">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
           <p className="text-xs text-green-700">SLA configuration saved successfully.</p>
         </div>
       )}
-
-      <div className="space-y-3">
-        {config.map((c) => (
-          <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${PRIORITY_COLORS[c.priority]}`}>
-              {c.priority}
-            </span>
-            <div className="flex items-center gap-2">
-              {editing === c.id ? (
-                <input
-                  type="number" min="1" max="720"
-                  value={c.resolutionTimeHours}
-                  onChange={(e) => handleChange(c.id, e.target.value)}
-                  onBlur={() => setEditing(null)}
-                  autoFocus
-                  className="w-20 px-2 py-1.5 text-sm text-center rounded-lg border border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
-                />
-              ) : (
-                <button onClick={() => setEditing(c.id)}
-                  className="text-sm font-semibold text-gray-800 px-3 py-1.5 rounded-lg hover:bg-indigo-50 hover:text-indigo-700 transition-colors">
-                  {c.resolutionTimeHours}h
-                </button>
-              )}
-              <span className="text-xs text-gray-500">resolution time</span>
-            </div>
-          </div>
-        ))}
+ 
+      {/* Column labels */}
+      <div className="flex items-center justify-between px-3 mt-4 mb-1.5">
+        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Priority</span>
+        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mr-8">Resolution Time</span>
       </div>
-      <p className="mt-3 text-xs text-gray-400">Click a value to edit. Changes apply to new tickets only.</p>
+ 
+      <div className="space-y-2">
+        {loading ? (
+          [1,2,3,4].map(i => (
+            <div key={i} className="h-14 rounded-xl bg-gray-100 animate-pulse" />
+          ))
+        ) : config.map((c) => {
+          const meta    = PRIORITY_META[c.priority] ?? PRIORITY_META.Low;
+          const isEditing = editing === c.id;
+          return (
+            <div key={c.id}
+              className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                isEditing
+                  ? 'bg-indigo-50/60 border-indigo-300 shadow-sm'
+                  : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+              }`}>
+ 
+              {/* Left: priority pill */}
+              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${meta.pill}`}>
+                {c.priority}
+              </span>
+ 
+              {/* Right: value field — click the field to edit */}
+              <div className="flex items-center gap-2">
+                {/* <span className="text-xs text-gray-400 mr-1">Resolution time</span> */}
+ 
+                <div
+                  onClick={() => !isEditing && setEditing(c.id)}
+                  className={`flex items-center rounded-lg border transition-all ${
+                    isEditing
+                      ? 'border-gray-300 bg-white'
+                      : 'border-gray-300 bg-white cursor-pointer hover:border-indigo-400 hover:ring-2 hover:ring-indigo-50'
+                  }`}>
+                  {isEditing ? (
+                    <input
+                      type="text" inputMode="numeric" pattern="[0-9]*"
+                      value={c.resolutionTimeHours}
+                      onChange={e => { const v = e.target.value.replace(/\D/g,''); if (v === '' || (Number(v) >= 1 && Number(v) <= 720)) handleChange(c.id, v || 1); }}
+                      autoFocus
+                      onBlur={() => setEditing(null)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(null); }}
+                      // ADDED: border-none focus:ring-0 focus:outline-none
+                      className="w-14 px-2 py-1.5 text-sm font-semibold text-center bg-transparent border-none outline-none focus:ring-0 focus:outline-none text-indigo-700"
+                    />
+                  ) : (
+                    <span className="w-14 px-2 py-1.5 text-sm font-semibold text-center text-gray-700 select-none">
+                      {c.resolutionTimeHours}
+                    </span>
+                  )}
+                  <span className={`pr-2 text-xs font-medium ${isEditing ? 'text-indigo-500' : 'text-gray-400'}`}>h</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+ 
+      <p className="mt-3 text-xs text-gray-400">Changes apply to new tickets only.</p>
     </div>
   );
 };

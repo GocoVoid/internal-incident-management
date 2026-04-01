@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { useAuthContext } from '../../context/AuthContext';
 import { useAdminTickets } from '../../context/AdminTicketContext';
@@ -164,6 +164,23 @@ export const AdminTickets = () => {
   const formatDate = iso => new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   const selCls = 'px-3 py-2 text-xs rounded-xl border border-gray-200 focus:border-indigo-400 outline-none bg-white';
 
+  const departments = useMemo(
+    () => [...new Set(CATEGORY_LIST.map(c => c.departmentName).filter(Boolean))].sort(),
+    []
+  );
+
+  const filteredCategories = useMemo(
+    () => filters.department
+      ? CATEGORY_LIST.filter(c => c.departmentName === filters.department)
+      : CATEGORY_LIST,
+    [filters.department]
+  );
+
+  const handleDeptChange = (dept) => {
+    updateFilter('department', dept);
+    updateFilter('category', '');
+  };
+
   return (
     <DashboardLayout title="All Tickets">
       <div className="space-y-5 animate-fade-in">
@@ -193,9 +210,13 @@ export const AdminTickets = () => {
                 <option value="">All Priority</option>
                 {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
+              <select value={filters.department} onChange={e => handleDeptChange(e.target.value)} className={selCls}>
+                <option value="">All Departments</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
               <select value={filters.category} onChange={e => updateFilter('category', e.target.value)} className={selCls}>
-                <option value="">All Category</option>
-                {CATEGORY_LIST.map(c => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
+                <option value="">All {filters.department ? `${filters.department} ` : ''}Categories</option>
+                {filteredCategories.map(c => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
               </select>
               {Object.values(filters).some(Boolean) && (
                 <button onClick={clearFilters} className="text-xs font-medium" style={{ color: '#14a0c8' }}>Clear</button>

@@ -26,4 +26,5 @@ export const getSLAConfig = () =>
  * Note: changing SLA config does NOT retroactively update open incidents.
  */
 export const updateSLAConfig = (id, resolutionTimeHours) =>
-  put(`/admin/updateSLA`, { id, resolutionTimeHours });
+{ console.log(id+" "+resolutionTimeHours);
+  put(`/admin/updateSLA`, { id, resolutionTimeHours });}

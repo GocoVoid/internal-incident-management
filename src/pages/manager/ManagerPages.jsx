@@ -473,7 +473,7 @@ export const ManagerAssign = () => {
                         <span className="font-mono text-xs font-medium w-36 shrink-0" style={{ color: '#3c3c8c' }}>{t.id}</span>
                         <span className="flex-1 text-sm text-gray-700 truncate">{t.title}</span>
                         <PriorityBadge priority={t.priority} />
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Unassigned</span>
+                        {/* <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Unassigned</span> */}
                       </li>
                     ))}
                   </ul>

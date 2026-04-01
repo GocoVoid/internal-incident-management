@@ -21,8 +21,9 @@
  */
 
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://iimp-backend.duckdns.org/api'
-//const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1111/api';
+//const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://iimp-backend.duckdns.org/api'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1111/api';
+//const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.62:1111/api';
 
 const rawPost = async (endpoint, body) => {
   const res  = await fetch(`${BASE_URL}${endpoint}`, {
@@ -57,11 +58,11 @@ export const refreshAccessToken = (refreshToken) =>
   rawPost('/auth/refresh', { refreshToken });
 
 /** POST /auth/change-password  (first-login forced reset) */
-export const changePassword = (email,oldPassword, newPassword, otpCode, purpose) =>
-  rawPost('/auth/change-password', { email, oldPassword, newPassword, otpCode, purpose });
+export const changePassword = (email,oldPassword, newPassword, otpCode, token, purpose) =>
+  rawPost('/auth/change-password', { email, oldPassword, newPassword, otpCode, token, purpose });
 
-export const forgotPassword = (email, newPassword, otpCode, purpose) =>
-rawPost('/auth/forgot-password', { email, newPassword, otpCode, purpose });
+export const forgotPassword = (email, newPassword, otpCode, token, purpose) =>
+  rawPost('/auth/forgot-password', { email, newPassword, otpCode, token, purpose });
 
 /** POST /auth/send-otp */
 export const sendOtp = (email, purpose) =>

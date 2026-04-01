@@ -38,7 +38,13 @@ const normalise = (t) => ({
   createdAt:      t.createdAt,
   updatedAt:      t.updatedAt    ?? null,
   comments:       [],
-  attachments:    [],
+  attachments: (t.attachments ?? []).map(a => ({
+    id:          a.id,
+    fileName:    a.fileName,
+    fileUrl:     a.fileUrl,
+    fileSize:    a.fileSize,
+    contentType: a.contentType,
+  })),
 });
 
 export const useSupportTickets = () => {

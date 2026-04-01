@@ -72,23 +72,19 @@ export const uploadFiles = (id, formData) =>
  * Server updates: updatedAt, resolvedAt (if Resolved), closedAt (if Closed)
  * Roles: SUPPORT_STAFF (own tickets), MANAGER, ADMIN
  */
-export const updateIncidentStatus = (incidentKey, newStatus) =>
-  {
-    if (newStatus=="In Progress") {
-      newStatus="IN_PROGRESS"
-    } else {
-      newStatus = newStatus.toUpperCase();
-    }
-    console.log(newStatus);
-    put(`/incidents/updateStatus/${incidentKey}`, { newStatus, note:null })
-  };
+export const updateIncidentStatus = (incidentKey, newStatus) => {
+  if (newStatus === 'In Progress') {
+    newStatus = 'IN_PROGRESS';
+  } else {
+    newStatus = newStatus.toUpperCase();
+  }
+  return put(`/incidents/updateStatus/${incidentKey}`, { newStatus, note: null });
+};
 
-  export const updateIncidentPriority = (incidentKey, priority) =>
-  {
-    priority = priority.toUpperCase();
-    console.log(incidentKey," ",priority);
-    patch(`/incidents/updatePriority/${incidentKey}`, { priority: priority.toUpperCase() })
-  };
+export const updateIncidentPriority = (incidentKey, priority) => {
+  priority = priority.toUpperCase();
+  return patch(`/incidents/updatePriority/${incidentKey}`, { priority });
+};
 
 /**
  * PATCH /incidents/:incidentKey/assign

@@ -205,8 +205,7 @@ const ResolutionNotePanel = ({ ticket, role, user, onSaveResolutionNote }) => {
     if (!note.trim()) return;
     setLoading(true);
     try {
-      await saveResolutionNote(ticket.id, note.trim());
-      setNote(note);
+      await onSaveResolutionNote(ticket.id, note.trim());
       setEditing(false);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -236,7 +235,7 @@ const ResolutionNotePanel = ({ ticket, role, user, onSaveResolutionNote }) => {
         </div>
         {canEdit && !editing && (
           <button onClick={() => setEditing(true)}
-            className="text-[12px] px-2 py-0.5 rounded-lg text-green-700 hover:bg-green-100 transition-colors font-medium">
+            className="text-[10px] px-2 py-0.5 rounded-lg text-green-700 hover:bg-green-100 transition-colors font-medium">
             {note ? 'Edit' : '+ Add'}
           </button>
         )}
@@ -282,6 +281,141 @@ const ResolutionNotePanel = ({ ticket, role, user, onSaveResolutionNote }) => {
           {canEdit ? 'No resolution note yet. Click "+ Add" to add one.' : 'No resolution note added yet.'}
         </p>
       )}
+    </div>
+  );
+};
+
+/* ── Employee Feedback Panel (Accept / Not Satisfied) ──── */
+const EmployeeFeedbackPanel = ({ ticket, onUpdateStatus, onAddComment, user }) => {
+  const [stage,   setStage]   = useState('prompt'); // 'prompt' | 'reject' | 'done_accept' | 'done_reject'
+  const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+
+  const handleAccept = async () => {
+    setLoading(true); setError('');
+    try {
+      await onUpdateStatus(ticket.id, 'Closed');
+      await onAddComment(
+        ticket.id,
+        '✓ Employee confirmed resolution and closed the ticket.',
+        user?.fullName,
+        false
+      );
+      setStage('done_accept');
+    } catch (e) { setError(e?.message ?? 'Failed to submit feedback.'); }
+    finally { setLoading(false); }
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!comment.trim()) return;
+    setLoading(true); setError('');
+    try {
+      await onAddComment(
+        ticket.id,
+        `Not satisfied with resolution: ${comment.trim()}`,
+        user?.fullName,
+        false
+      );
+      await onUpdateStatus(ticket.id, 'In Progress');
+      setStage('done_reject');
+    } catch (e) { setError(e?.message ?? 'Failed to submit feedback.'); }
+    finally { setLoading(false); }
+  };
+
+  if (stage === 'done_accept') {
+    return (
+      <div className="rounded-xl p-4 flex items-center gap-3 animate-fade-in"
+        style={{ background: '#f0fdf4', border: '1px solid #d1fae5' }}>
+        {/* Verification badge */}
+        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+          style={{ background: 'linear-gradient(135deg,#059669,#047857)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className="text-sm font-semibold text-green-800">Ticket Closed</p>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+              style={{ background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0' }}>
+              ✓ Verified by Employee
+            </span>
+          </div>
+          <p className="text-xs text-green-600">Thank you for confirming the resolution.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'done_reject') {
+    return (
+      <div className="rounded-xl p-4 flex items-center gap-3 animate-fade-in"
+        style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+          style={{ background: 'linear-gradient(135deg,#d97706,#b45309)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-amber-800">Ticket Reopened</p>
+          <p className="text-xs text-amber-600 mt-0.5">Your concern has been sent to the support team for review.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'reject') {
+    return (
+      <div className="rounded-xl p-4 space-y-3 animate-fade-in"
+        style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+        <p className="text-xs font-semibold text-orange-800">Please tell us what's missing or incorrect:</p>
+        <textarea
+          value={comment}
+          onChange={e => setComment(e.target.value)}
+          rows={3}
+          placeholder="Describe what still needs to be resolved…"
+          className="w-full px-3 py-2 text-sm rounded-xl border border-orange-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none resize-none bg-white"
+          autoFocus
+        />
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2">
+          <button onClick={handleRejectSubmit} disabled={!comment.trim() || loading}
+            className="flex-1 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50 transition-colors"
+            style={{ background: 'linear-gradient(135deg,#d97706,#b45309)' }}>
+            {loading ? 'Submitting…' : 'Submit & Reopen'}
+          </button>
+          <button onClick={() => { setStage('prompt'); setComment(''); setError(''); }} disabled={loading}
+            className="px-3 py-2 rounded-xl text-xs font-medium text-orange-700 bg-white border border-orange-200 hover:bg-orange-50 transition-colors">
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // stage === 'prompt'
+  return (
+    <div className="rounded-xl p-4 space-y-3" style={{ background: '#f5f5fc', border: '1px solid #eeeef8' }}>
+      <p className="text-xs font-semibold text-indigo-800 uppercase tracking-widest">Your Feedback</p>
+      <p className="text-xs text-gray-600">Are you satisfied with the resolution provided?</p>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={handleAccept} disabled={loading}
+          className="flex-1 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-60 transition-colors"
+          style={{ background: 'linear-gradient(135deg,#059669,#047857)' }}>
+          {loading ? 'Processing…' : '✓ Satisfied'}
+        </button>
+        <button onClick={() => setStage('reject')} disabled={loading}
+          className="flex-1 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-60 transition-colors"
+          style={{ background: 'linear-gradient(135deg,#d97706,#b45309)' }}>
+          ✗ Not Satisfied
+        </button>
+      </div>
     </div>
   );
 };
@@ -357,7 +491,7 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
       )}
 
       {/* Status transitions */}
-      {transitions.length > 0 && (
+      {role!=='SUPPORT_STAFF' && transitions.length > 0 && (
         <div>
           <p className="text-[10px] font-medium text-gray-500 mb-2 uppercase tracking-wide">Update status</p>
           <div className="flex flex-wrap gap-2">
@@ -402,13 +536,13 @@ const ActionsPanel = ({ ticket, role, user, onUpdateStatus, onAssign, onAddComme
         <form onSubmit={handleComment} className="space-y-2">
           <input value={comment} onChange={e => setComment(e.target.value)}
             placeholder="Type a comment…" className={selCls + ' w-full'} />
-          {(role === 'SUPPORT_STAFF' || role === 'MANAGER' || role === 'ADMIN') && (
+          {/* {(role === 'SUPPORT_STAFF' || role === 'MANAGER' || role === 'ADMIN') && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={isInternal} onChange={e => setIsInternal(e.target.checked)}
                 className="w-3.5 h-3.5 rounded" />
               <span className="text-xs text-gray-500">Internal note (not visible to employee)</span>
             </label>
-          )}
+          )} */}
           <button type="submit" disabled={!comment.trim() || loading === 'comment'}
             className="w-full py-1.5 rounded-xl text-xs font-medium text-white disabled:opacity-50 transition-colors"
             style={{ background:'linear-gradient(135deg,#3c3c8c,#4f4fa3)' }}>
@@ -432,9 +566,23 @@ const TicketDetailModal = ({
   const [auditLog,  setAuditLog]  = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
-  const [resolutionNote, setResolutionNote] = useState(initialTicket?.resolutionNote ?? '');
+  const [resolutionNote, setResolutionNote] = useState('');
+  const prevTicketIdRef = React.useRef(initialTicket?.id);
 
-  useEffect(() => { setTicket(initialTicket); setResolutionNote(initialTicket?.resolutionNote ?? ''); }, [initialTicket]);
+  // Sync ticket metadata. resolutionNote is NEVER taken from the prop —
+  // it is populated exclusively by fetchResolutionNote() from the API.
+  useEffect(() => {
+    if (!initialTicket) return;
+    const isNewTicket = prevTicketIdRef.current !== initialTicket.id;
+    prevTicketIdRef.current = initialTicket.id;
+    setTicket(prev => {
+      // Same ticket: merge to keep locally-fetched data intact
+      if (!isNewTicket && prev) return { ...initialTicket, resolutionNote: prev.resolutionNote };
+      return initialTicket;
+    });
+    // On a new ticket, clear stale note — fetchResolutionNote will fill it
+    if (isNewTicket) setResolutionNote('');
+  }, [initialTicket]);
 
   /* Fetch comments from server when comments tab opened */
   const fetchComments = useCallback(async () => {
@@ -481,28 +629,44 @@ const TicketDetailModal = ({
     if (activeTab === 'audit') fetchAudit();
   }, [activeTab, fetchAudit]);
 
-  /* Fetch resolution note when modal opens (SUPPORT_STAFF / MANAGER / ADMIN only) */
+  /* Fetch resolution note when modal opens */
   const fetchResolutionNote = useCallback(async () => {
     if (!ticket?.id) return;
-    if (role !== 'SUPPORT_STAFF' && role !== 'MANAGER' && role !== 'ADMIN') return;
+    const isEmployee = role === 'EMPLOYEE';
+    const ticketResolved = ticket?.status === 'Resolved' || ticket?.status === 'Closed';
+    if (isEmployee && !ticketResolved) return;
+    if (role !== 'SUPPORT_STAFF' && role !== 'MANAGER' && role !== 'ADMIN' && !isEmployee) return;
     try {
       const data = await getResolutionNote(ticket.id);
-      // console.log(data[0].note);
-      const note = data[0]?.note ?? '';
+      // Handle all possible response shapes from the API:
+      // array: [{note: '...'}]  |  object: {note: '...'}  |  object: {resolutionNote: '...'}  |  string
+      let note = '';
+      if (Array.isArray(data)) {
+        note = data[0]?.note ?? data[0]?.resolutionNote ?? '';
+      } else if (typeof data === 'string') {
+        note = data;
+      } else if (data && typeof data === 'object') {
+        note = data.note ?? data.resolutionNote ?? data.content ?? '';
+      }
       setResolutionNote(note);
       setTicket(p => ({ ...p, resolutionNote: note }));
-    } catch { /* keep existing */ }
-  }, [ticket?.id, role]);
+    } catch (err) {
+      console.error('fetchResolutionNote failed:', err);
+    }
+  }, [ticket?.id, role, ticket?.status]);
 
   useEffect(() => {
     if (isOpen && ticket?.id) fetchResolutionNote();
-  }, [isOpen, ticket?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, ticket?.id, fetchResolutionNote]); // fetchResolutionNote in deps so role/status changes re-trigger
 
-  /* Handle save resolution note — optimistic update */
+  /* Handle save resolution note — save then re-fetch from API */
   const handleSaveResolutionNote = async (id, note) => {
     await saveResolutionNote(id, note);
+    // Optimistic update first for instant UI response
     setResolutionNote(note);
     setTicket(p => ({ ...p, resolutionNote: note }));
+    // Then re-fetch to confirm server state
+    fetchResolutionNote();
   };
 
 
@@ -562,20 +726,24 @@ const TicketDetailModal = ({
     ...(role === 'SUPPORT_STAFF' || role === 'MANAGER' || role === 'ADMIN'
       ? [{ key: 'resolution', label: 'Resolution Note' }]
       : []),
+    // EMPLOYEE sees resolution tab when ticket is Resolved so they can accept/reject
+    ...(role === 'EMPLOYEE' && (ticket.status === 'Resolved')
+      ? [{ key: 'resolution', label: 'Resolution' }]
+      : []),
     ...(role === 'MANAGER' || role === 'ADMIN'
       ? [{ key: 'audit', label: 'Audit Trail' }]
       : []),
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-3" style={{ paddingTop: "0" }}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-3" style={{ paddingTop: "4rem" }}>
       <div className="absolute inset-0 animate-fade-in"
         style={{ background: 'rgba(26,26,78,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose} />
 
       <div className="relative w-full sm:max-w-4xl bg-white rounded-t-2xl sm:rounded-2xl animate-slide-up flex flex-col"
         style={{ maxHeight: 'calc(100vh - 0px)', height: '100dvh', boxShadow: '0 32px 80px rgba(26,26,78,0.25), 0 8px 24px rgba(26,26,78,0.12)' }}
-        ref={el => { if (el) { if (window.innerWidth >= 640) { el.style.height = ''; el.style.maxHeight = 'calc(100vh - 80px)'; } else { el.style.height = '92dvh'; el.style.maxHeight = ''; } } }}>
+        ref={el => { if (el) { if (window.innerWidth >= 640) { el.style.height = ''; el.style.maxHeight = 'calc(100vh - 80px)'; } else { el.style.height = 'calc(100dvh - 4rem)'; el.style.maxHeight = ''; } } }}>
 
         {/* Header */}
         <div className="flex items-start gap-4 px-6 py-4 shrink-0"
@@ -622,9 +790,13 @@ const TicketDetailModal = ({
               {assignedToName ?? <span className="text-gray-400 font-normal">Unassigned</span>}
             </MetaRow> */}
             <MetaRow label="Created">{formatDate(ticket.createdAt)}</MetaRow>
-            <MetaRow label="Updated">{formatDate(ticket.updatedAt)}</MetaRow>
-            {ticket.resolvedAt && <MetaRow label="Resolved">{formatDate(ticket.resolvedAt)}</MetaRow>}
-            {ticket.closedAt   && <MetaRow label="Closed">{formatDate(ticket.closedAt)}</MetaRow>}
+            {role=='MANAGER' &&
+              <>
+              <MetaRow label="Updated">{formatDate(ticket.updatedAt)}</MetaRow>
+              {ticket.resolvedAt && <MetaRow label="Resolved">{formatDate(ticket.resolvedAt)}</MetaRow>}
+              {ticket.closedAt   && <MetaRow label="Closed">{formatDate(ticket.closedAt)}</MetaRow>}
+              </>
+            }
 
             <div className="pt-3">
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">SLA</p>
@@ -730,40 +902,63 @@ const TicketDetailModal = ({
               )}
 
               {activeTab === 'resolution' && (
-                <div className="animate-fade-in">
-                  {/* <div className="flex items-center gap-2 mb-4">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Resolution Note</p>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
-                      Staff · Manager · Admin only
-                    </span>
-                  </div> */}
-                  {resolutionNote ? (
-                    <div className="rounded-xl p-4 space-y-3"
-                      style={{ background: '#f0fdf4', border: '1px solid #d1fae5' }}>
-                      <div className="flex items-center gap-2">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2"
-                          strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0">
-                          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-                        </svg>
-                        <span className="text-xs font-semibold text-green-800">How it was resolved</span>
+                <div className="animate-fade-in space-y-4">
+                  {/* Note display — colour reflects current status */}
+                  {resolutionNote ? (() => {
+                    const isRejected = ticket.status === 'In Progress';
+                    const bg     = isRejected ? '#fffbeb' : '#f0fdf4';
+                    const border = isRejected ? '#fde68a' : '#d1fae5';
+                    const iconColor  = isRejected ? '#d97706' : '#059669';
+                    const labelColor = isRejected ? '#92400e' : '#065f46';
+                    const timeColor  = isRejected ? '#d97706' : '#059669';
+                    return (
+                      <div className="rounded-xl p-4 space-y-2"
+                        style={{ background: bg, border: `1px solid ${border}` }}>
+                        <div className="flex items-center gap-2">
+                          <svg viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2"
+                            strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0">
+                            <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                          </svg>
+                          <span className="text-xs font-semibold" style={{ color: labelColor }}>
+                            {isRejected ? 'Resolution Note (Under Review)' : 'How it was resolved'}
+                          </span>
+                          {isRejected && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                              style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                              Employee not satisfied
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{resolutionNote}</p>
+                        {ticket.resolvedAt && (
+                          <p className="text-[10px]" style={{ color: timeColor }}>
+                            Resolved on {formatDateTime(ticket.resolvedAt)}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{resolutionNote}</p>
-                      {ticket.resolvedAt && (
-                        <p className="text-[10px] text-green-600">Resolved on {formatDateTime(ticket.resolvedAt)}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
+                    );
+                  })() : (
+                    <div className="text-center py-8">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
                         strokeLinecap="round" strokeLinejoin="round"
                         className="w-8 h-8 text-gray-300 mx-auto mb-3">
                         <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
                       </svg>
                       <p className="text-sm text-gray-400">No resolution note yet.</p>
-                      {/* {role === 'SUPPORT_STAFF' && (
-                        <p className="text-xs text-gray-400 mt-1">Use the panel on the left to add one.</p>
-                      )} */}
+                      {role === 'SUPPORT_STAFF' && (
+                        <p className="text-xs text-gray-400 mt-1">Add a note using the panel on the left.</p>
+                      )}
                     </div>
+                  )}
+
+                  {/* EMPLOYEE feedback — only when ticket is Resolved */}
+                  {role === 'EMPLOYEE' && ticket.status === 'Resolved' && (
+                    <EmployeeFeedbackPanel
+                      ticket={ticket}
+                      onUpdateStatus={handleUpdateStatus}
+                      onAddComment={handleAddComment}
+                      user={user}
+                    />
                   )}
                 </div>
               )}

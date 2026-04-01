@@ -1,4 +1,4 @@
-import { get } from './apiClient';
+import { get, put } from './apiClient';
 
 export const getAssignedTickets = () =>
   get('/support/getAssignedTickets');
@@ -10,4 +10,4 @@ export const getUnreadNotifications = () =>
   get('/support/getUnreadNotifications');
 
 export const updateIncidentStatusWithNote = (incidentKey, resolutionNote = '') =>
-  api.patch(`/incidents/${incidentKey}/status`, { incidentKey: incidentKey, resolutionNote: resolutionNote });
+  put(`/incidents/updateStatus/${incidentKey}`, { newStatus: 'RESOLVED', note: resolutionNote });

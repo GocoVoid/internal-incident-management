@@ -41,7 +41,7 @@ export const AdminTicketProvider = ({ children }) => {
   /* ── Master list (all tickets, fetched once) ── */
   const [allTickets,  setAllTickets]  = useState([]);
   const [stats,       setStats]       = useState({ total:0, open:0, inProgress:0, resolved:0, closed:0, breached:0 });
-  const [filters,     setFilters]     = useState({ status:'', priority:'', category:'', search:'' });
+  const [filters,     setFilters]     = useState({ status:'', priority:'', category:'', department:'', search:'' });
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
 
@@ -108,6 +108,7 @@ export const AdminTicketProvider = ({ children }) => {
     if (filters.status)   list = list.filter(t => t.status   === filters.status);
     if (filters.priority) list = list.filter(t => t.priority === filters.priority);
     if (filters.category) list = list.filter(t => t.category === filters.category);
+    if (filters.department) list = list.filter(t => t.department === filters.department);
     if (filters.search) {
       const q = filters.search.toLowerCase();
       list = list.filter(t =>
@@ -130,7 +131,7 @@ export const AdminTicketProvider = ({ children }) => {
   }, []);
 
   const clearFilters = useCallback(() => {
-    setFilters({ status:'', priority:'', category:'', search:'' });
+    setFilters({ status:'', priority:'', category:'', department:'', search:'' });
     setPage(0);
   }, []);
 

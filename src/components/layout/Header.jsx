@@ -141,7 +141,7 @@ const Header = ({ title, onMenuClick }) => {
 
   return (
     <>
-      <header className="h-16 bg-white shrink-0 z-20 flex items-center px-6 gap-4"
+      <header className="h-16 bg-white shrink-0 relative z-20 flex items-center px-6 gap-4"
         style={{ borderBottom:'1px solid #e5e7eb', boxShadow:'0 1px 8px rgba(60,60,140,0.06)' }}>
 
         {/* Left */}
@@ -162,10 +162,10 @@ const Header = ({ title, onMenuClick }) => {
         <div className="flex items-center gap-2 shrink-0">
 
           {/* Role badge */}
-          <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium"
+          {/* <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium"
             style={{ background:roleStyle.bg, color:roleStyle.text, border:`1px solid ${roleStyle.border}` }}>
             {ROLE_LABELS[user?.role]}-{user?.department}
-          </span>
+          </span> */}
 
           {/* New Ticket button — all roles */}
           <button onClick={() => setShowCreate(true)}
@@ -344,7 +344,7 @@ const Header = ({ title, onMenuClick }) => {
 </div>
 
           {/* Logout — hidden on mobile (accessible via profile dropdown) */}
-          <button onClick={onLogout}
+          {/* <button onClick={onLogout}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ml-1"
             style={{ color:'#6b7280', border:'1px solid #e5e7eb' }}
             onMouseEnter={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.color='#dc2626'; e.currentTarget.style.borderColor='#fecaca'; }}
@@ -356,7 +356,7 @@ const Header = ({ title, onMenuClick }) => {
               <line x1="21" y1="12" x2="9" y2="12"/>
             </svg>
             Logout
-          </button>
+          </button> */}
         </div>
       </header>
 
